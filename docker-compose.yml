@@ -1,0 +1,29 @@
+# This is a compose file meant for local development.
+# @TODO: Think through service discovery
+
+version: "3"
+services:
+  # Used by wizard_api.
+  postgres:
+    image: postgres:9.6
+    environment:
+      - POSTGRES_DB=wizard
+      - POSTGRES_PASSWORD=wizard
+    ports:
+      - "6543:5432"
+
+  # @TODO: Migrations step that depends on postgres and waits for it to be
+  #        available. Then wizard_api can depend on this.
+
+  # Web service is the main API the game talks to.
+  # Handles everything except for running instances of the game server.
+  wizard_api:
+    build: ./wizard_api
+    working_dir: /root/wizard_api/
+    command: bash -c "python -m wizard_api.application"
+    volumes:
+      - ./wizard_api:/root/wizard_api
+    ports:
+      - "9001:9001"
+    links:
+      - postgres
