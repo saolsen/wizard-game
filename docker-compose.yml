@@ -32,3 +32,4 @@ services:
     build: ./wizard_server
     ports:
       - 40000:40000/udp
+    privileged: true

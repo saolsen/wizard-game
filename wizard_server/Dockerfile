@@ -10,7 +10,7 @@
 # @TODO: Also figure out libsodium. Just installing it is probably chill
 # for the server. Don't know what to do for linux client yet. TBD
 
-FROM ubuntu:latest
+FROM ubuntu:devel
 
 RUN \
   apt-get update && \
@@ -19,6 +19,11 @@ RUN \
   apt-get install -y libsodium-dev && \
   apt-get install -y mg && \
   apt-get install -y gdb && \
+  apt-get install -y netcat && \
+  apt-get install -y strace && \
+  apt-get install -y tcpdump && \
+  apt-get install -y tmux && \
+  apt-get install -y net-tools && \        
   rm -rf /var/lib/apt/lists/*
 
 ADD . /root/wizard_server
@@ -30,6 +35,22 @@ RUN cc \
     -I3rdparty/include \
     -o wizard_server \
     src/wizard_server.c \
+    3rdparty/include/netcode.c \
+    -lsodium
+
+RUN cc \
+    -Wall -g \
+    -I3rdparty/include \
+    -o client_server \
+    src/client_server.c \
+    3rdparty/include/netcode.c \
+    -lsodium
+
+RUN cc \
+    -Wall -g \
+    -I3rdparty/include \
+    -o client \
+    src/client.c \
     3rdparty/include/netcode.c \
     -lsodium
 
