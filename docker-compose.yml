@@ -27,3 +27,6 @@ services:
       - "9001:9001"
     links:
       - postgres
+
+  wizard_server:
+    build: ./wizard_server
