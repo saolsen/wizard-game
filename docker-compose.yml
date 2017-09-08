@@ -30,3 +30,5 @@ services:
 
   wizard_server:
     build: ./wizard_server
+    ports:
+      - 40000:40000/udp
