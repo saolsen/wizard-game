@@ -1,10 +1,14 @@
-#if 1
 #include "netcode.h"
+
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
 #include <signal.h>
 #include <inttypes.h>
+
+#include "raylib.h"
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
 
 #define CONNECT_TOKEN_EXPIRY 30
 #define CONNECT_TOKEN_TIMEOUT 5
@@ -25,8 +29,13 @@ static uint8_t private_key[NETCODE_KEY_BYTES] = { 0x60, 0x6a, 0xbe, 0x6e, 0xc9, 
 
 int main( int argc, char ** argv )
 {
-    (void) argc;
-    (void) argv;
+    // raylib
+    int screen_width = 1024;
+    int screen_height = 768;
+
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    InitWindow(screen_width, screen_height, "Wizard Game");
+    SetTargetFPS(60);
 
     if ( netcode_init() != NETCODE_OK )
     {
@@ -72,7 +81,7 @@ int main( int argc, char ** argv )
     for ( i = 0; i < NETCODE_MAX_PACKET_SIZE; ++i )
         packet_data[i] = (uint8_t) i;
 
-    while ( !quit )
+    while (!WindowShouldClose())
     {
         netcode_client_update( client, time );
 
@@ -97,22 +106,31 @@ int main( int argc, char ** argv )
         if ( netcode_client_state( client ) <= NETCODE_CLIENT_STATE_DISCONNECTED )
             break;
 
-        netcode_sleep( delta_time );
+        BeginDrawing();
+
+        ClearBackground(RAYWHITE);
+        DrawFPS(GetScreenWidth() - 250, 10);
+
+        int frack = GuiButton((Rectangle) { 10, 10, 400, 200 }, FormatText("Hello World: %s", "fracker"));
+        if (frack) {
+            printf("U pressed it\n");
+
+            //int hello_packet_size = NETCODE_MAX_PACKET_SIZE;
+            static char hello_packet[NETCODE_MAX_PACKET_SIZE] = "Hello";
+
+            netcode_client_send_packet(client, hello_packet, sizeof(hello_packet));
+        }
+
+        EndDrawing();
 
         time += delta_time;
     }
 
-    if ( quit )
-    {
-        printf( "\nshutting down\n" );
-    }
+    printf( "\nshutting down\n" );
 
     netcode_client_destroy( client );
 
     netcode_term();
-
-    printf("Press Any Key to Continue\n");
-    getch();
+    CloseWindow();
     return 0;
 }
-#endif

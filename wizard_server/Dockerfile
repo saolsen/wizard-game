@@ -38,22 +38,6 @@ RUN cc \
     3rdparty/include/netcode.c \
     -lsodium
 
-RUN cc \
-    -Wall -g \
-    -I3rdparty/include \
-    -o client_server \
-    src/client_server.c \
-    3rdparty/include/netcode.c \
-    -lsodium
-
-RUN cc \
-    -Wall -g \
-    -I3rdparty/include \
-    -o client \
-    src/client.c \
-    3rdparty/include/netcode.c \
-    -lsodium
-
 EXPOSE 40000
 
-CMD /root/wizard_server/wizard_server
+CMD ["stdbuf", "-o0", "/root/wizard_server/wizard_server"]
