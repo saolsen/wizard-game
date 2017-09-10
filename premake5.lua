@@ -48,3 +48,14 @@ project "WizardServer"
       optimize "Speed"
       links { "sodium-release" }
    
+if os.is "windows" then
+   newaction
+   {
+      trigger = "solution",
+      description = "Create an open vs solution",
+      execute = function()
+         os.execute "premake5 vs2017"
+         os.execute "start build/WizardGame.sln"
+      end
+   }
+end
