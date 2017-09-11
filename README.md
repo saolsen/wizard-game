@@ -18,16 +18,18 @@ WizardAPI is written in python and uses postgres to store state.
 
 ### Prerequisites
 
-For wizard client and server you need to have premake5 installed to generate project files and build the project. Dependencies vary by platform.
+For all platforms you need premake5 installed to generate project files and build the project. Dependencies vary by platform.
 
 #### Windows
 * Visual Studio 2017
 #### OSX
 * Xcode command line tools (basically just clang and make)
+* glfw3 `brew install glfw3`
+* libsodium `brew install libsodium`
 #### Linux
-* A C compiler
-* make
-* libsodium
+* A C compiler and make
+* glfw3 `dunno` // @TODO
+* libsodium `wat` // @TODO
 
 For WizardAPI you need python3 and to install the requirements in the requirements.txt in the web folder. You'll also need postgres to run it and the easiest way to get that all setup is to just use the included Dockerfile and docker-compose files. See below.
 

@@ -18,6 +18,13 @@ workspace "WizardGame"
    symbols "On"
    includedirs { "3rdparty/include" }
 
+   configuration "Debug"
+      defines { "DEBUG" }
+
+   configuration "Release"
+      defines { "NDEBUG" }
+      optimize "Speed"
+
    filter "system:windows"
       system "windows"
       libdirs { "3rdparty/lib/windows" }
@@ -31,44 +38,12 @@ workspace "WizardGame"
 project "WizardClient"
    kind "ConsoleApp"
    files { "src/wizard_client.c", "3rdparty/include/netcode.c" }
-   links { "glfw3", "raylib"}
-   
-   configuration "Debug"
-      defines { "DEBUG" }
-
-      filter "system:linux"
-         links { "sodium" }
-      filter "system:windows"
-         links { "sodium-debug"}
-   
-   configuration "Release"
-      defines { "NDEBUG" }
-      optimize "Speed"
-
-      filter "system:linux"
-         links { "sodium" }
-      filter "system:windows"
-         links { "sodium-release"}
+   links { "sodium", "glfw3", "raylib"}
 
 project "WizardServer"
    kind "ConsoleApp"
    files { "src/wizard_server.c", "3rdparty/include/netcode.c" }
-   configuration "Debug"
-      defines { "DEBUG" }
-      
-      filter "system:linux"
-         links { "sodium" }
-      filter "system:windows"
-         links { "sodium-debug"}
-   
-   configuration "Release"
-      defines { "NDEBUG" }
-      optimize "Speed"
-   
-      filter "system:linux"
-         links { "sodium" }
-      filter "system:windows"
-         links { "sodium-release"}
+   links { "sodium" }
    
    
 if os.is "windows" then

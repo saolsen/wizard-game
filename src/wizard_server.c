@@ -81,27 +81,40 @@ int main(int argc, char **argv) {
         // @Q: What does this do?
         netcode_server_update(server, time);
 
-        if (netcode_server_client_connected( server, 0 )) {
+        if (netcode_server_client_connected(server, 0)) {
             // @Q: What packet are we sending?
-            netcode_server_send_packet( server, 0, packet_data, NETCODE_MAX_PACKET_SIZE );
+            // we're sending packet_data to 0 which is what if nobody is connected yet?
+            netcode_server_send_packet(server, 0, packet_data, NETCODE_MAX_PACKET_SIZE);
         }
 
         int client_index;
-        for ( client_index = 0; client_index < NETCODE_MAX_CLIENTS; ++client_index ) {
+        for (client_index = 0; client_index < NETCODE_MAX_CLIENTS; ++client_index) {
             for (;;) {
                 int packet_bytes;
                 uint64_t packet_sequence;
-                void * packet = netcode_server_receive_packet(server, client_index, &packet_bytes, &packet_sequence);
+                void *packet = netcode_server_receive_packet(server, client_index, &packet_bytes, &packet_sequence);
                 if (!packet) { break; }
                 (void) packet_sequence;
 
-                printf("received a packet from client %i\n", client_index);
+                // ok, so this is def the data that you send and this is how you get it.
+                uint8_t *packet_array_bytes = (uint8_t*)packet;
+                printf("packet: %i%i%i%i%i",
+                    packet_array_bytes[0],
+                    packet_array_bytes[1],
+                    packet_array_bytes[2],
+                    packet_array_bytes[3],
+                    packet_array_bytes[4]
+                );
+
+                // printf("received a packet from client %i\n", client_index);
 
                 // @Q: Not quite sure what this does but it explodes for custom packets.
-                assert(packet_bytes == NETCODE_MAX_PACKET_SIZE);
+                //assert(packet_bytes == NETCODE_MAX_PACKET_SIZE);
                 // @Q: This is checking that the whole packet maches whatever is stored in packet_data above.
                 // I dunno why I would wish for that.... I think I just have to check the first n bytes or something?
-                assert(memcmp(packet, packet_data, NETCODE_MAX_PACKET_SIZE) == 0);
+                //assert(memcmp(packet, packet_data, NETCODE_MAX_PACKET_SIZE) == 0);
+
+                // Now i have a packet. So like, I think I can inspect it and stuff.
 
                 netcode_server_free_packet(server, packet);
             }
@@ -121,6 +134,6 @@ int main(int argc, char **argv) {
     netcode_server_destroy(server);
 
     netcode_term();
-    
+    getch();
     return 0;
 }

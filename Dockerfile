@@ -14,6 +14,7 @@ RUN \
   apt-get install -y tmux && \
   apt-get install -y net-tools && \
   apt-get install -y wget && \
+  apt-get install -y libglfw3-dev && \
   rm -rf /var/lib/apt/lists/*
 
 RUN wget https://github.com/jedisct1/libsodium/releases/download/1.0.10/libsodium-1.0.10.tar.gz && \
@@ -33,6 +34,8 @@ RUN wget https://github.com/premake/premake-core/releases/download/v5.0.0-alpha1
 
 ADD . /root/wizard-game
 WORKDIR /root/wizard-game
+
+RUN rm -rf /root/wizard-game/build
 
 # @TODO: Build everything.
 RUN find . -exec touch {} \; && premake5 gmake && cd build && make -j32 WizardServer config=release

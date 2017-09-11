@@ -1,3 +1,6 @@
+// @NOTE:
+// I've edited this a lot so I don't recomment copying this version for your own project.
+// Go get the origional from github.
 /*******************************************************************************************
 *
 *   raygui v1.5 - A simple and easy-to-use IMGUI (Immedite Mode GUI) library for raylib (www.raylib.com)
@@ -55,7 +58,7 @@
 *       1.1 (01-Jun-2017) Complete review of the library
 *       1.0 (07-Jun-2016) Converted to header-only by Ramon Santamaria.
 *       0.9 (07-Mar-2016) Reviewed and tested by Albert Martos, Ian Eito, Sergio Martinez and Ramon Santamaria.
-*       0.8 (27-Aug-2015) Initial release. Implemented by Kevin Gato, Daniel Nicolás and Ramon Santamaria.
+*       0.8 (27-Aug-2015) Initial release. Implemented by Kevin Gato, Daniel Nicolï¿½s and Ramon Santamaria.
 *
 *   CONTRIBUTORS:
 *       Kevin Gato:         Initial implementation of basic components (2014)
@@ -340,7 +343,7 @@ typedef enum { DISABLED, NORMAL, FOCUSED, PRESSED } ControlState;
     #define DEFAULT_BACKGROUND_COLOR        0xf5f5f5ff
     #define DEFAULT_LINES_COLOR             0x90abb5ff
     #define DEFAULT_TEXT_FONT               0
-    #define DEFAULT_TEXT_SIZE               10
+    #define DEFAULT_TEXT_SIZE               100
     #define DEFAULT_BORDER_WIDTH            1
 
     #define DEFAULT_BORDER_COLOR_NORMAL     0x828282ff
