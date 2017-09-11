@@ -78,3 +78,6 @@ Wizard Game uses a few wonderful open source libraries.
 * [netcode.io](https://github.com/networkprotocol/netcode.io)
 * [realiable.io](https://github.com/networkprotocol/reliable.io)
 * [raylib](https://github.com/raysan5/raylib)
+
+@TODO:
+Probably also going to use sqlite and msgpack

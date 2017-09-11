@@ -128,7 +128,7 @@ int main( int argc, char ** argv )
 
     printf( "\nshutting down\n" );
 
-    netcode_client_destroy( client );
+    netcode_client_destroy(client);
 
     netcode_term();
     CloseWindow();
