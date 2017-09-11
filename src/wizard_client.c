@@ -6,6 +6,7 @@
 // need to look into realiable.io.
 
 #include "netcode.h"
+#include "reliable.h"
 #include "mpack.h"
 
 #include <stdio.h>
@@ -98,7 +99,7 @@ int main(int argc, char**argv ) {
 
             netcode_client_send_packet(client, data, size);
             free(data);
-            
+
             //netcode_client_send_packet(client, packet_data, NETCODE_MAX_PACKET_SIZE);
         }
 

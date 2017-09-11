@@ -19,6 +19,7 @@
 // digital ocean sounds really great too....
 
 #include "netcode.h"
+#include "reliable.h"
 #include "mpack.h"
 
 #include <stdio.h>
@@ -67,6 +68,12 @@ int main(int argc, char **argv) {
         printf("error: failed to create server\n");
         return 1;
     }
+
+    reliable_init();
+    struct reliable_config_t reliable_config;
+    reliable_default_config(&reliable_config);
+
+    struct reliable_endpoint_t *reliable_endpoint = reliable_endpoint_create(&reliable_config, time);
 
     netcode_server_start(server, NETCODE_MAX_CLIENTS);
 
@@ -154,12 +161,10 @@ int main(int argc, char **argv) {
         printf("\nshutting down\n");
     }
 
-    netcode_server_destroy(server);
 
+    reliable_term();
+
+    netcode_server_destroy(server);
     netcode_term();
-    #ifdef _WIN32
-    printf("Press any key to continue...");
-    getch();
-    #endif
     return 0;
 }

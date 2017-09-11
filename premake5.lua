@@ -9,7 +9,6 @@
 
 -- @TODO: I just need to bundle everything and build it on the fly. It's easier that way for every platform.
 -- Need cross platform raylib.
-
 workspace "WizardGame"
    configurations { "Debug", "Release" }
    architecture "x86_64"
@@ -37,12 +36,14 @@ workspace "WizardGame"
 
 project "WizardClient"
    kind "ConsoleApp"
-   files { "src/wizard_client.c", "3rdparty/include/netcode.c", "3rdparty/include/mpack.c" }
+   files { "src/wizard_client.c",
+           "3rdparty/include/netcode.c", "3rdparty/include/reliable.c", "3rdparty/include/mpack.c" }
    links { "sodium", "glfw3", "raylib"}
 
 project "WizardServer"
    kind "ConsoleApp"
-   files { "src/wizard_server.c", "3rdparty/include/netcode.c", "3rdparty/include/mpack.c" }
+   files { "src/wizard_server.c",
+           "3rdparty/include/netcode.c", "3rdparty/include/reliable.c", "3rdparty/include/mpack.c" }
    links { "sodium" }
    
    
