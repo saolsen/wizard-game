@@ -29,6 +29,19 @@ static uint8_t private_key[NETCODE_KEY_BYTES] = { 0x60, 0x6a, 0xbe, 0x6e, 0xc9, 
                                                   0x43, 0x71, 0xd6, 0x2c, 0xd1, 0x99, 0x27, 0x26,
                                                   0x6b, 0x3c, 0x60, 0xf4, 0xb7, 0x15, 0xab, 0xa1 };
 
+// These are set in the reliable config.
+// I think when you send "RELIABLE SEND PACKET"
+// it uses this function, I'm not sure when the process function gets called tho.
+void transmit_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_bytes)
+{
+
+}
+
+void process_packet_function(void* _context, int index, uint16_6 sequence, uint8_t packet_data, int packet_bytes)
+{
+
+}
+
 int main(int argc, char**argv ) {
     // raylib
     int screen_width = 1024;
@@ -72,12 +85,43 @@ int main(int argc, char**argv ) {
 
     netcode_client_connect(client, connect_token);
 
+    struct reliable_config_t reliable_config;
+    reliable_default_config(&reliable_config);
+    // @Q: What is this? I think this is the max size for a packet
+    //     before it gets fragmented.
+    //     I'm not sure what the default it.
+    reliable_config.fragment_above = 500;
+    // @TODO: Set the sender config name, I think for debugging.
+    // @Q: What is the context.
+    reliable_config.index = 0;
+    reliable_config.transmit_packet_function = NULL;
+    reliable_config.process_packet_function = NULL;
+
+    // @TODO: I need to set this because this is all the transmit packet
+    // and process packet functions have to get state. I probably
+    // need to pass any of the netcode.io stuff in here.
+    reliable_config.context = NULL; 
+    reliable_config.transmit_packet_function = &transmit_packet_function;
+    reliable_config.process_packet_function = &process_packet_function;
+
+    reliable_endpoint_t reliable_endpoint = reliable_endpoint_create(&reliable_config, time);
+
+    // then I think we use the reliable endpoint by hitting it with
+    // reliable_endpoint_send_packet
+    // and
+    // reliable_endpoint_update
+    // now I don't know what update does but I think that it resends
+    // stuff that hasn't been acked. I dunno how it gets the packets tho.
+    // @TODO: Figure it out.
+    
+
     uint8_t packet_data[NETCODE_MAX_PACKET_SIZE];
     int i;
     for (i = 0; i < NETCODE_MAX_PACKET_SIZE; ++i)
         packet_data[i] = (uint8_t) i;
 
     while (!WindowShouldClose()) {
+        // I guess I call reliable_endpoint_update here.
         netcode_client_update(client, time);
 
         if (netcode_client_state(client) == NETCODE_CLIENT_STATE_CONNECTED) {
