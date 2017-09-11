@@ -300,8 +300,8 @@
 //----------------------------------------------------------------------------------
 #ifndef __cplusplus
 // Boolean type
-#if !defined(_STDBOOL_H) || !defined(__STDBOOL_H)   // CLang uses second form
-typedef enum { false, true } bool;
+#if !defined(_STDBOOL_H) || !defined(__STDBOOL_H) || !defined(_STDBOOL)
+//typedef enum { false, true } bool;
 #endif
 #endif
 

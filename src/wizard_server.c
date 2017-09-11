@@ -19,6 +19,7 @@
 // digital ocean sounds really great too....
 
 #include "netcode.h"
+#include "mpack.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -96,17 +97,39 @@ int main(int argc, char **argv) {
                 if (!packet) { break; }
                 (void) packet_sequence;
 
-                // ok, so this is def the data that you send and this is how you get it.
-                uint8_t *packet_array_bytes = (uint8_t*)packet;
-                printf("packet: %i%i%i%i%i",
-                    packet_array_bytes[0],
-                    packet_array_bytes[1],
-                    packet_array_bytes[2],
-                    packet_array_bytes[3],
-                    packet_array_bytes[4]
-                );
+                if (packet_bytes != NETCODE_MAX_PACKET_SIZE) {
 
-                // printf("received a packet from client %i\n", client_index);
+                    // ok, so this is def the data that you send and this is how you get it.
+                    /* uint8_t *packet_array_bytes = (uint8_t*)packet;
+                    printf("packet: %i%i%i%i%i",
+                        packet_array_bytes[0],
+                        packet_array_bytes[1],
+                        packet_array_bytes[2],
+                        packet_array_bytes[3],
+                        packet_array_bytes[4]
+                    ); */
+
+                    printf("received a packet from client %i\n", client_index);
+                    
+                    mpack_reader_t reader;
+                    mpack_reader_init_data(&reader, packet, packet_bytes);
+                    
+                    char key1[20];
+                    bool b;
+                    char key2[20];
+                    uint32_t i;
+
+                    mpack_expect_map_match(&reader, 2);
+                    mpack_expect_cstr(&reader, key1, sizeof(key1));
+                    b = mpack_expect_bool(&reader);
+                    mpack_expect_cstr(&reader, key2, sizeof(key2));
+                    i = mpack_expect_uint(&reader);
+                    mpack_done_map(&reader);
+
+                    mpack_reader_destroy(&reader);
+
+                    printf("{%s: %s, %s: %u}\n", key1, (b ? "true" : "false"), key2, i);
+                }
 
                 // @Q: Not quite sure what this does but it explodes for custom packets.
                 //assert(packet_bytes == NETCODE_MAX_PACKET_SIZE);
@@ -134,6 +157,9 @@ int main(int argc, char **argv) {
     netcode_server_destroy(server);
 
     netcode_term();
+    #ifdef _WIN32
+    printf("Press any key to continue...");
     getch();
+    #endif
     return 0;
 }

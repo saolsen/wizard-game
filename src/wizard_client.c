@@ -6,10 +6,12 @@
 // need to look into realiable.io.
 
 #include "netcode.h"
+#include "mpack.h"
 
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include <stdbool.h>
 #include <inttypes.h>
 
 #include "raylib.h"
@@ -78,10 +80,26 @@ int main(int argc, char**argv ) {
         netcode_client_update(client, time);
 
         if (netcode_client_state(client) == NETCODE_CLIENT_STATE_CONNECTED) {
-            // if you get that we're connected send packet_data, what is packet_data?
-            // looks like it's just 12345.....
-            // why are we sending that?
-            netcode_client_send_packet(client, packet_data, NETCODE_MAX_PACKET_SIZE);
+            char *data;
+            size_t size;
+            mpack_writer_t writer;
+            mpack_writer_init_growable(&writer, &data, &size);
+
+            mpack_start_map(&writer, 2);
+            mpack_write_cstr(&writer, "compact");
+            mpack_write_bool(&writer, true);
+            mpack_write_cstr(&writer, "schema");
+            mpack_write_uint(&writer, 0);
+            mpack_finish_map(&writer);
+
+            if (mpack_writer_destroy(&writer) != mpack_ok) {
+                printf("Error encoding data, :(\n");
+            }
+
+            netcode_client_send_packet(client, data, size);
+            free(data);
+            
+            //netcode_client_send_packet(client, packet_data, NETCODE_MAX_PACKET_SIZE);
         }
 
         while (1) {

@@ -37,12 +37,12 @@ workspace "WizardGame"
 
 project "WizardClient"
    kind "ConsoleApp"
-   files { "src/wizard_client.c", "3rdparty/include/netcode.c" }
+   files { "src/wizard_client.c", "3rdparty/include/netcode.c", "3rdparty/include/mpack.c" }
    links { "sodium", "glfw3", "raylib"}
 
 project "WizardServer"
    kind "ConsoleApp"
-   files { "src/wizard_server.c", "3rdparty/include/netcode.c" }
+   files { "src/wizard_server.c", "3rdparty/include/netcode.c", "3rdparty/include/mpack.c" }
    links { "sodium" }
    
    
