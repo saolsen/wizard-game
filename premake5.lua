@@ -46,6 +46,9 @@ project "WizardServer"
            "3rdparty/include/netcode.c", "3rdparty/include/reliable.c", "3rdparty/include/mpack.c" }
    links { "sodium" }
    
+project "WizardTests"
+   kind "ConsoleApp"
+   files { "src/wizard_tests.c" }
    
 if os.is "windows" then
    newaction
