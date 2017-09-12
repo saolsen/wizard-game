@@ -19,15 +19,13 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
-#define CONNECT_TOKEN_EXPIRY 30
-#define CONNECT_TOKEN_TIMEOUT 5
-#define PROTOCOL_ID 0x1122334455667788
+#include "wizard_network.h"
 
 // @TODO: Share this with server and client for test.
-static uint8_t private_key[NETCODE_KEY_BYTES] = { 0x60, 0x6a, 0xbe, 0x6e, 0xc9, 0x19, 0x10, 0xea, 
+/* static uint8_t private_key[NETCODE_KEY_BYTES] = { 0x60, 0x6a, 0xbe, 0x6e, 0xc9, 0x19, 0x10, 0xea, 
                                                   0x9a, 0x65, 0x62, 0xf6, 0x6f, 0x2b, 0x30, 0xe4, 
                                                   0x43, 0x71, 0xd6, 0x2c, 0xd1, 0x99, 0x27, 0x26,
-                                                  0x6b, 0x3c, 0x60, 0xf4, 0xb7, 0x15, 0xab, 0xa1 };
+                                                  0x6b, 0x3c, 0x60, 0xf4, 0xb7, 0x15, 0xab, 0xa1 }; */
 
 // These are set in the reliable config.
 // I think when you send "RELIABLE SEND PACKET"
@@ -54,73 +52,18 @@ int main(int argc, char**argv ) {
     InitWindow(screen_width, screen_height, "Wizard Game");
     SetTargetFPS(60);
 
-    if (netcode_init() != NETCODE_OK) {
-        printf( "error: failed to initialize netcode.io\n" );
-        return 1;
-    }
-
-    netcode_log_level( NETCODE_LOG_LEVEL_INFO );
+    Client client = (Client){0};
 
     double time = 0.0;
     double delta_time = 1.0 / 60.0;
 
-    printf( "[client]\n" );
-
-    struct netcode_client_t *client = netcode_client_create("0.0.0.0", time);
-
-    if (!client) {
-        printf("error: failed to create client\n");
-        return 1;
-    }
-
-    // @HARDCODE
-    NETCODE_CONST char *server_address = (argc != 2) ? "127.0.0.1:40000" : argv[1];
-
-    uint64_t client_id = 0;
-    netcode_random_bytes( (uint8_t*) &client_id, 8 );
-    printf("client id is %.16" PRIx64 "\n", client_id);
-
-    uint8_t connect_token[NETCODE_CONNECT_TOKEN_BYTES];
-
-    if (netcode_generate_connect_token( 1, &server_address, CONNECT_TOKEN_EXPIRY, CONNECT_TOKEN_TIMEOUT, client_id, PROTOCOL_ID, 0, private_key, connect_token) != NETCODE_OK) {
-        printf("error: failed to generate connect token\n");
-        return 1;
-    }
-
-    netcode_client_connect(client, connect_token);
-
-    struct reliable_config_t reliable_config;
-    reliable_default_config(&reliable_config);
-    // @Q: What is this? I think this is the max size for a packet
-    //     before it gets fragmented.
-    //     I'm not sure what the default it.
-    reliable_config.fragment_above = 500;
-    // @TODO: Set the sender config name, I think for debugging.
-    // @Q: What is the context.
-    reliable_config.index = 0;
-    reliable_config.transmit_packet_function = NULL;
-    reliable_config.process_packet_function = NULL;
-
-    // @TODO: I need to set this because this is all the transmit packet
-    // and process packet functions have to get state. I probably
-    // need to pass any of the netcode.io stuff in here.
-    reliable_config.context = client;
-    reliable_config.transmit_packet_function = &transmit_packet_function;
-    reliable_config.process_packet_function = &process_packet_function;
-
-    struct reliable_endpoint_t *reliable_endpoint = reliable_endpoint_create(&reliable_config, time);
-
-    uint8_t packet_data[NETCODE_MAX_PACKET_SIZE];
-    int i;
-    for (i = 0; i < NETCODE_MAX_PACKET_SIZE; ++i)
-        packet_data[i] = (uint8_t) i;
+    client_connect(&client, time, NULL);
 
     while (!WindowShouldClose()) {
-        // I guess I call reliable_endpoint_update here.
-        netcode_client_update(client, time);
-        reliable_endpoint_update(reliable_endpoint, time);
+        client_update(&client, time);
 
-        if (netcode_client_state(client) == NETCODE_CLIENT_STATE_CONNECTED) {
+        // @TODO: state stuff in our client
+        if (netcode_client_state(client.netcode_client) == NETCODE_CLIENT_STATE_CONNECTED) {
             char *data;
             size_t size;
             mpack_writer_t writer;
@@ -137,34 +80,19 @@ int main(int argc, char**argv ) {
                 printf("Error encoding data, :(\n");
             }
 
-            reliable_endpoint_send_packet(reliable_endpoint, data, size);
+            client_packet_send(&client, data, (uint32_t)size);
             
             free(data);
         }
 
-        while (1) {
-            int packet_bytes;
-            uint64_t packet_sequence;
-            // does recieve packet do the full process for verifying the packet?
-            // is packet_bytes just what I want?
-            // I think this is like asserting that the packet I'm getting is what I sent because
-            // the 
-            void * packet = netcode_client_receive_packet(client, &packet_bytes, &packet_sequence);
-            if (!packet)
-                break;
-            (void) packet_sequence;
-            reliable_endpoint_receive_packet(reliable_endpoint, packet, packet_bytes); 
-            
-            // now our callback is called with the packet without reliable header.
-            // seems like kinda a dumb way to do it...
-            
-            //assert(packet_bytes == NETCODE_MAX_PACKET_SIZE);
-            //assert(memcmp(packet, packet_data, NETCODE_MAX_PACKET_SIZE) == 0);
-            
-            netcode_client_free_packet(client, packet);
+        uint8_t *packet;
+        uint32_t packet_size;
+        uint64_t packet_sequence;
+        while (packet = client_packet_receive(&client, &packet_size, &packet_sequence)) {
+            printf("We got a packet!");
         }
 
-        if (netcode_client_state(client) <= NETCODE_CLIENT_STATE_DISCONNECTED) {};
+        //if (netcode_client_state(client) <= NETCODE_CLIENT_STATE_DISCONNECTED) {};
 
         BeginDrawing();
 
@@ -182,17 +110,14 @@ int main(int argc, char**argv ) {
         //}
 
         EndDrawing();
-
+        
+        client_send_packets(&client);
         time += delta_time;
     }
 
     printf( "\nshutting down\n" );
 
-    
-    netcode_client_destroy(client);
-    
-    reliable_term();
-    netcode_term();
+    client_destroy(&client);
     CloseWindow();
     return 0;
 }
