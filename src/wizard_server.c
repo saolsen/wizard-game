@@ -28,6 +28,8 @@
 #include <signal.h>
 #include <inttypes.h>
 
+#include "wizard_network.h"
+
 static volatile int quit = 0;
 
 void interrupt_handler( int signal )
@@ -36,97 +38,18 @@ void interrupt_handler( int signal )
     quit = 1;
 }
 
-// @HARDCODE: Shared private key between client and server.
-static uint8_t private_key[NETCODE_KEY_BYTES] = { 0x60, 0x6a, 0xbe, 0x6e, 0xc9, 0x19, 0x10, 0xea, 
-                                                  0x9a, 0x65, 0x62, 0xf6, 0x6f, 0x2b, 0x30, 0xe4, 
-                                                  0x43, 0x71, 0xd6, 0x2c, 0xd1, 0x99, 0x27, 0x26,
-                                                  0x6b, 0x3c, 0x60, 0xf4, 0xb7, 0x15, 0xab, 0xa1 };
-
-struct wrapped_server {
-    struct netcode_server_t *server;
-    int client_index;
-};
-
-void transmit_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_bytes)
+int main(int argc, char **argv)
 {
-    struct wrapped_server *wrap = (struct wrapped_server*)_context;
-    netcode_server_send_packet(wrap->server, wrap->client_index, packet_data, packet_bytes);
-    // @NOTE: I think index is a thing we can use to keep track of the packet.
-}
+    NetworkServer server = (NetworkServer){0};
 
-int process_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_bytes)
-{
-    struct wrapped_server *wrap = (struct wrapped_server*)_context;
-    if (packet_bytes != NETCODE_MAX_PACKET_SIZE) {
-        printf("received a packet from client %i\n", wrap->client_index);
-                    
-        mpack_reader_t reader;
-        mpack_reader_init_data(&reader, packet_data, packet_bytes);
-        
-        char key1[20];
-        bool b;
-        char key2[20];
-        uint32_t i;
-
-        mpack_expect_map_match(&reader, 2);
-        mpack_expect_cstr(&reader, key1, sizeof(key1));
-        b = mpack_expect_bool(&reader);
-        mpack_expect_cstr(&reader, key2, sizeof(key2));
-        i = mpack_expect_uint(&reader);
-        mpack_done_map(&reader);
-
-        mpack_reader_destroy(&reader);
-
-        printf("{%s: %s, %s: %u}\n", key1, (b ? "true" : "false"), key2, i);
-    }
-    
-    return 0;
-}
-
-int main(int argc, char **argv) {
-
-    if (netcode_init() != NETCODE_OK)
-    {
-        printf( "error: failed to initialize netcode.io\n" );
-        return 1;
-    }
-
-    netcode_log_level(NETCODE_LOG_LEVEL_INFO);
-
-    double time = 0.0;
     // @Q: is 60fps the way to do it?
+    double time = 0.0;
     double delta_time = 1.0 / 60.0;
 
-    // @HARDCODE
-    #define TEST_PROTOCOL_ID 0x1122334455667788
+    // @TODO: Like a lot of work on auth and shit.
+    server_run(&server, time);
 
-    // @HARDCODE
-    char * server_address = "127.0.0.1:40000";
-
-    struct netcode_server_t *server = netcode_server_create(server_address, TEST_PROTOCOL_ID, private_key, time);
-
-    if (!server) {
-        printf("error: failed to create server\n");
-        return 1;
-    }
-
-    reliable_init();
-    // I will need a reliable endpoint for each client, for now I'm just gonna do one for client 0.
-    struct reliable_config_t reliable_config;
-    reliable_default_config(&reliable_config);
-    reliable_config.fragment_above = 500;
-    reliable_config.index = 0;
-    reliable_config.transmit_packet_function = &transmit_packet_function;
-    reliable_config.process_packet_function = &process_packet_function;
-
-    struct wrapped_server wrap = {.server = server, .client_index = 0};
-    reliable_config.context = &wrap;
-
-    struct reliable_endpoint_t *reliable_endpoint = reliable_endpoint_create(&reliable_config, time);
-
-    netcode_server_start(server, NETCODE_MAX_CLIENTS);
-
-    signal(SIGINT, interrupt_handler);
+    signal(SIGTERM, interrupt_handler);
 
     // Storage for packets.
     uint8_t packet_data[NETCODE_MAX_PACKET_SIZE];
@@ -135,43 +58,50 @@ int main(int argc, char **argv) {
         packet_data[i] = (uint8_t) i;
 
     while (!quit) {
-        // @Q: What does this do?
-        netcode_server_update(server, time);
-        //reliable_update(time);
+        server_update(&server, time);
 
-        if (netcode_server_client_connected(server, 0)) {
-            // @Q: What packet are we sending?
-            // we're sending packet_data to 0 which is what if nobody is connected yet?
-            reliable_endpoint_send_packet(reliable_endpoint, packet_data, NETCODE_MAX_PACKET_SIZE);
-            //netcode_server_send_packet(server, 0, packet_data, NETCODE_MAX_PACKET_SIZE);
+        // @TODO: API for this or good way to write code like this.
+        if (netcode_server_client_connected(server.netcode_server, 0)) {
+            server_packet_send(&server, 0, packet_data, NETCODE_MAX_PACKET_SIZE);
         }
 
         int client_index;
-        for (client_index = 0; client_index < NETCODE_MAX_CLIENTS; ++client_index) {
+        for (client_index = 0; client_index < MAX_CONNECTED_CLIENTS; ++client_index) {
             for (;;) {
-                int packet_bytes;
+                int packet_size;
                 uint64_t packet_sequence;
-                void *packet = netcode_server_receive_packet(server, client_index, &packet_bytes, &packet_sequence);
+                void *packet = server_packet_receive(&server, client_index, &packet_size, &packet_sequence);
                 if (!packet) { break; }
-                (void) packet_sequence;
 
-                reliable_endpoint_receive_packet(reliable_endpoint, packet, packet_bytes);
+                if (packet_size != NETCODE_MAX_PACKET_SIZE) {
+                    printf("received a packet from client %i\n", client_index);
+                    
+                    mpack_reader_t reader;
+                    mpack_reader_init_data(&reader, packet, packet_size);
+        
+                    char key1[20];
+                    bool b;
+                    char key2[20];
+                    uint32_t i;
 
-                // @Q: Not quite sure what this does but it explodes for custom packets.
-                //assert(packet_bytes == NETCODE_MAX_PACKET_SIZE);
-                // @Q: This is checking that the whole packet maches whatever is stored in packet_data above.
-                // I dunno why I would wish for that.... I think I just have to check the first n bytes or something?
-                //assert(memcmp(packet, packet_data, NETCODE_MAX_PACKET_SIZE) == 0);
+                    mpack_expect_map_match(&reader, 2);
+                    mpack_expect_cstr(&reader, key1, sizeof(key1));
+                    b = mpack_expect_bool(&reader);
+                    mpack_expect_cstr(&reader, key2, sizeof(key2));
+                    i = mpack_expect_uint(&reader);
+                    mpack_done_map(&reader);
 
-                // Now i have a packet. So like, I think I can inspect it and stuff.
+                    mpack_reader_destroy(&reader);
 
-                netcode_server_free_packet(server, packet);
+                    printf("{%s: %s, %s: %u}\n", key1, (b ? "true" : "false"), key2, i);
+                }
+
+                server_packet_free(&server);
             }
         }
 
         // @Q: What does this really do?
         netcode_sleep(delta_time);
-
         time += delta_time;
     }
 
@@ -180,10 +110,6 @@ int main(int argc, char **argv) {
         printf("\nshutting down\n");
     }
 
-
-    reliable_term();
-
-    netcode_server_destroy(server);
-    netcode_term();
+    server_destroy(&server);
     return 0;
 }

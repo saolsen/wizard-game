@@ -21,28 +21,6 @@
 
 #include "wizard_network.h"
 
-// @TODO: Share this with server and client for test.
-/* static uint8_t private_key[NETCODE_KEY_BYTES] = { 0x60, 0x6a, 0xbe, 0x6e, 0xc9, 0x19, 0x10, 0xea, 
-                                                  0x9a, 0x65, 0x62, 0xf6, 0x6f, 0x2b, 0x30, 0xe4, 
-                                                  0x43, 0x71, 0xd6, 0x2c, 0xd1, 0x99, 0x27, 0x26,
-                                                  0x6b, 0x3c, 0x60, 0xf4, 0xb7, 0x15, 0xab, 0xa1 }; */
-
-// These are set in the reliable config.
-// I think when you send "RELIABLE SEND PACKET"
-// it uses this function, I'm not sure when the process function gets called tho.
-void transmit_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_bytes)
-{
-    struct netcode_client_t *client = (struct netcode_client_t*)_context;
-    netcode_client_send_packet(client, packet_data, packet_bytes);
-    // @NOTE: I think index is a thing we can use to keep track of the packet.
-}
-
-int process_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_bytes)
-{
-    printf("Received Packet\n");
-    return 0;
-}
-
 int main(int argc, char**argv ) {
     // raylib
     int screen_width = 1024;
@@ -52,7 +30,7 @@ int main(int argc, char**argv ) {
     InitWindow(screen_width, screen_height, "Wizard Game");
     SetTargetFPS(60);
 
-    Client client = (Client){0};
+    NetworkClient client = (NetworkClient){0};
 
     double time = 0.0;
     double delta_time = 1.0 / 60.0;
@@ -89,7 +67,7 @@ int main(int argc, char**argv ) {
         uint32_t packet_size;
         uint64_t packet_sequence;
         while (packet = client_packet_receive(&client, &packet_size, &packet_sequence)) {
-            printf("We got a packet!");
+            printf("We got a packet!\n");
         }
 
         //if (netcode_client_state(client) <= NETCODE_CLIENT_STATE_DISCONNECTED) {};
@@ -119,5 +97,7 @@ int main(int argc, char**argv ) {
 
     client_destroy(&client);
     CloseWindow();
+    printf("Press any key to continue...");
+    getch();
     return 0;
 }
