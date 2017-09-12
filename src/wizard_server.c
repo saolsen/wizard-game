@@ -42,6 +42,47 @@ static uint8_t private_key[NETCODE_KEY_BYTES] = { 0x60, 0x6a, 0xbe, 0x6e, 0xc9, 
                                                   0x43, 0x71, 0xd6, 0x2c, 0xd1, 0x99, 0x27, 0x26,
                                                   0x6b, 0x3c, 0x60, 0xf4, 0xb7, 0x15, 0xab, 0xa1 };
 
+struct wrapped_server {
+    struct netcode_server_t *server;
+    int client_index;
+};
+
+void transmit_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_bytes)
+{
+    struct wrapped_server *wrap = (struct wrapped_server*)_context;
+    netcode_server_send_packet(wrap->server, wrap->client_index, packet_data, packet_bytes);
+    // @NOTE: I think index is a thing we can use to keep track of the packet.
+}
+
+int process_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_bytes)
+{
+    struct wrapped_server *wrap = (struct wrapped_server*)_context;
+    if (packet_bytes != NETCODE_MAX_PACKET_SIZE) {
+        printf("received a packet from client %i\n", wrap->client_index);
+                    
+        mpack_reader_t reader;
+        mpack_reader_init_data(&reader, packet_data, packet_bytes);
+        
+        char key1[20];
+        bool b;
+        char key2[20];
+        uint32_t i;
+
+        mpack_expect_map_match(&reader, 2);
+        mpack_expect_cstr(&reader, key1, sizeof(key1));
+        b = mpack_expect_bool(&reader);
+        mpack_expect_cstr(&reader, key2, sizeof(key2));
+        i = mpack_expect_uint(&reader);
+        mpack_done_map(&reader);
+
+        mpack_reader_destroy(&reader);
+
+        printf("{%s: %s, %s: %u}\n", key1, (b ? "true" : "false"), key2, i);
+    }
+    
+    return 0;
+}
+
 int main(int argc, char **argv) {
 
     if (netcode_init() != NETCODE_OK)
@@ -70,8 +111,16 @@ int main(int argc, char **argv) {
     }
 
     reliable_init();
+    // I will need a reliable endpoint for each client, for now I'm just gonna do one for client 0.
     struct reliable_config_t reliable_config;
     reliable_default_config(&reliable_config);
+    reliable_config.fragment_above = 500;
+    reliable_config.index = 0;
+    reliable_config.transmit_packet_function = &transmit_packet_function;
+    reliable_config.process_packet_function = &process_packet_function;
+
+    struct wrapped_server wrap = {.server = server, .client_index = 0};
+    reliable_config.context = &wrap;
 
     struct reliable_endpoint_t *reliable_endpoint = reliable_endpoint_create(&reliable_config, time);
 
@@ -88,11 +137,13 @@ int main(int argc, char **argv) {
     while (!quit) {
         // @Q: What does this do?
         netcode_server_update(server, time);
+        //reliable_update(time);
 
         if (netcode_server_client_connected(server, 0)) {
             // @Q: What packet are we sending?
             // we're sending packet_data to 0 which is what if nobody is connected yet?
-            netcode_server_send_packet(server, 0, packet_data, NETCODE_MAX_PACKET_SIZE);
+            reliable_endpoint_send_packet(reliable_endpoint, packet_data, NETCODE_MAX_PACKET_SIZE);
+            //netcode_server_send_packet(server, 0, packet_data, NETCODE_MAX_PACKET_SIZE);
         }
 
         int client_index;
@@ -104,39 +155,7 @@ int main(int argc, char **argv) {
                 if (!packet) { break; }
                 (void) packet_sequence;
 
-                if (packet_bytes != NETCODE_MAX_PACKET_SIZE) {
-
-                    // ok, so this is def the data that you send and this is how you get it.
-                    /* uint8_t *packet_array_bytes = (uint8_t*)packet;
-                    printf("packet: %i%i%i%i%i",
-                        packet_array_bytes[0],
-                        packet_array_bytes[1],
-                        packet_array_bytes[2],
-                        packet_array_bytes[3],
-                        packet_array_bytes[4]
-                    ); */
-
-                    printf("received a packet from client %i\n", client_index);
-                    
-                    mpack_reader_t reader;
-                    mpack_reader_init_data(&reader, packet, packet_bytes);
-                    
-                    char key1[20];
-                    bool b;
-                    char key2[20];
-                    uint32_t i;
-
-                    mpack_expect_map_match(&reader, 2);
-                    mpack_expect_cstr(&reader, key1, sizeof(key1));
-                    b = mpack_expect_bool(&reader);
-                    mpack_expect_cstr(&reader, key2, sizeof(key2));
-                    i = mpack_expect_uint(&reader);
-                    mpack_done_map(&reader);
-
-                    mpack_reader_destroy(&reader);
-
-                    printf("{%s: %s, %s: %u}\n", key1, (b ? "true" : "false"), key2, i);
-                }
+                reliable_endpoint_receive_packet(reliable_endpoint, packet, packet_bytes);
 
                 // @Q: Not quite sure what this does but it explodes for custom packets.
                 //assert(packet_bytes == NETCODE_MAX_PACKET_SIZE);

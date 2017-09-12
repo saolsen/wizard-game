@@ -34,12 +34,15 @@ static uint8_t private_key[NETCODE_KEY_BYTES] = { 0x60, 0x6a, 0xbe, 0x6e, 0xc9, 
 // it uses this function, I'm not sure when the process function gets called tho.
 void transmit_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_bytes)
 {
-
+    struct netcode_client_t *client = (struct netcode_client_t*)_context;
+    netcode_client_send_packet(client, packet_data, packet_bytes);
+    // @NOTE: I think index is a thing we can use to keep track of the packet.
 }
 
-void process_packet_function(void* _context, int index, uint16_6 sequence, uint8_t packet_data, int packet_bytes)
+int process_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_bytes)
 {
-
+    printf("Received Packet\n");
+    return 0;
 }
 
 int main(int argc, char**argv ) {
@@ -70,6 +73,7 @@ int main(int argc, char**argv ) {
         return 1;
     }
 
+    // @HARDCODE
     NETCODE_CONST char *server_address = (argc != 2) ? "127.0.0.1:40000" : argv[1];
 
     uint64_t client_id = 0;
@@ -100,20 +104,11 @@ int main(int argc, char**argv ) {
     // @TODO: I need to set this because this is all the transmit packet
     // and process packet functions have to get state. I probably
     // need to pass any of the netcode.io stuff in here.
-    reliable_config.context = NULL; 
+    reliable_config.context = client;
     reliable_config.transmit_packet_function = &transmit_packet_function;
     reliable_config.process_packet_function = &process_packet_function;
 
-    reliable_endpoint_t reliable_endpoint = reliable_endpoint_create(&reliable_config, time);
-
-    // then I think we use the reliable endpoint by hitting it with
-    // reliable_endpoint_send_packet
-    // and
-    // reliable_endpoint_update
-    // now I don't know what update does but I think that it resends
-    // stuff that hasn't been acked. I dunno how it gets the packets tho.
-    // @TODO: Figure it out.
-    
+    struct reliable_endpoint_t *reliable_endpoint = reliable_endpoint_create(&reliable_config, time);
 
     uint8_t packet_data[NETCODE_MAX_PACKET_SIZE];
     int i;
@@ -123,6 +118,7 @@ int main(int argc, char**argv ) {
     while (!WindowShouldClose()) {
         // I guess I call reliable_endpoint_update here.
         netcode_client_update(client, time);
+        reliable_endpoint_update(reliable_endpoint, time);
 
         if (netcode_client_state(client) == NETCODE_CLIENT_STATE_CONNECTED) {
             char *data;
@@ -141,10 +137,9 @@ int main(int argc, char**argv ) {
                 printf("Error encoding data, :(\n");
             }
 
-            netcode_client_send_packet(client, data, size);
+            reliable_endpoint_send_packet(reliable_endpoint, data, size);
+            
             free(data);
-
-            //netcode_client_send_packet(client, packet_data, NETCODE_MAX_PACKET_SIZE);
         }
 
         while (1) {
@@ -158,8 +153,14 @@ int main(int argc, char**argv ) {
             if (!packet)
                 break;
             (void) packet_sequence;
-            assert(packet_bytes == NETCODE_MAX_PACKET_SIZE);
-            assert(memcmp(packet, packet_data, NETCODE_MAX_PACKET_SIZE) == 0);
+            reliable_endpoint_receive_packet(reliable_endpoint, packet, packet_bytes); 
+            
+            // now our callback is called with the packet without reliable header.
+            // seems like kinda a dumb way to do it...
+            
+            //assert(packet_bytes == NETCODE_MAX_PACKET_SIZE);
+            //assert(memcmp(packet, packet_data, NETCODE_MAX_PACKET_SIZE) == 0);
+            
             netcode_client_free_packet(client, packet);
         }
 
@@ -187,8 +188,10 @@ int main(int argc, char**argv ) {
 
     printf( "\nshutting down\n" );
 
+    
     netcode_client_destroy(client);
-
+    
+    reliable_term();
     netcode_term();
     CloseWindow();
     return 0;
