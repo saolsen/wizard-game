@@ -37,3 +37,13 @@ THEN worry about deps and builds.
 - release archives for stuff you download as a release and compile (like libsodium and prolly glfw3)
 - just check in any windows libs
 - have a script for compiling dependencies that need compilation.
+
+
+
+
+
+
+Right now
+- pass messages (no reliability yet but whatever)
+    - write the game logic with messages (all just assumed reliable (even tho they really aint))
+    

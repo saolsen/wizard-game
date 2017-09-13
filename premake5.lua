@@ -33,6 +33,7 @@ workspace "WizardGame"
 
    filter "system:linux"
       system "linux"
+      linkoptions { "--static" }
 
 project "WizardClient"
    kind "ConsoleApp"

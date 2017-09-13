@@ -29,8 +29,17 @@ services:
   #    - postgres
 
   wizard_server:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.build
     ports:
       - 40000:40000/udp
-    privileged: true
-    command: "stdbuf -o0 /root/wizard-game/build/bin/Release/WizardServer"
+    # privileged: true # This is needed for gdb.
+    command: "WizardServer" # stdbuf -o0 if needed
+
+  wizard_tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.build
+    # privileged: true # This is needed for gdb.
+    command: "WizardTests"
