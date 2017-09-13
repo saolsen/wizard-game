@@ -38,6 +38,6 @@ WORKDIR /root/wizard-game
 RUN rm -rf /root/wizard-game/build
 
 # @TODO: Build everything.
-RUN find . -exec touch {} \; && premake5 gmake && cd build && make -j32 WizardServer config=release
+RUN find . -exec touch {} \; && premake5 gmake && cd build && make -j32 WizardServer WizardTests config=release
 
 EXPOSE 40000

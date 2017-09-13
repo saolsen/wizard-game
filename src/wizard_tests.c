@@ -1,10 +1,14 @@
-// Tests shit
+#define WIZARD_TESTING
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
 #include <stdbool.h>
 
 #include "greatest.h"
+
+#include "wizard_network.h"
+#include "wizard_message.h"
 
 TEST test_a_good_thing(void) {
     ASSERT(true);
@@ -26,5 +30,7 @@ GREATEST_MAIN_DEFS();
 int main(int argc, char **argv) {
     GREATEST_MAIN_BEGIN();
     RUN_SUITE(wizard_tests);
+    RUN_SUITE(wizard_network_tests);
+    RUN_SUITE(wizard_message_tests);
     GREATEST_MAIN_END();
 }

@@ -93,7 +93,7 @@ int main(int argc, char **argv)
 
                     mpack_reader_destroy(&reader);
 
-                    printf("{%s: %s, %s: %u}\n", key1, (b ? "true" : "false"), key2, i);
+                    fprintf(stderr, "{%s: %s, %s: %u}\n", key1, (b ? "true" : "false"), key2, i);
                 }
 
                 server_packet_free(&server);

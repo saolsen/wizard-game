@@ -1,11 +1,9 @@
-// Firstly this is just a copy over. 1 packet per message.
-// Then I can do reliable stuff.
-// Then I can do a message oriented interface where they get packed up together.
-
 #ifndef _wizard_network_h
 #define _wizard_network_h
 
+#include <inttypes.h>
 #include <stdint.h>
+
 #include "netcode.h"
 #include "reliable.h"
 
@@ -307,5 +305,28 @@ void server_destroy(NetworkServer *server)
     reliable_term();
     netcode_term();
 }
+#endif
 
+#ifdef WIZARD_TESTING
+// @TODO: What is the best way to really test this stuff.
+// I think I need to use the built in mocking stuff netcode.io has and like really test the shit out of
+// all my actuial use cases.
+
+// Lets just start by recording some things to test.
+// Reliable messages get re-sent.
+// Big messages get split up, dropped parts get resent and once they all come through it works.
+// Broadcast stuff.
+// Buffered broadcast stuff.
+// o boy a lot of shit...
+
+// I should be able to reuse this for later multiplayer games tho, that's pretty dope.
+
+TEST test_network_thingy(void) {
+    ASSERT(true);
+    PASS();
+}
+
+SUITE(wizard_network_tests) {
+    RUN_TEST(test_network_thingy);
+}
 #endif

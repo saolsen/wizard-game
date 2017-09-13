@@ -1,10 +1,3 @@
-// connection status.
-// - log                       button
-
-// server relays connections and button presses.
-// This means all button presses have to be reliably sent.
-// need to look into realiable.io.
-
 #include "netcode.h"
 #include "reliable.h"
 #include "mpack.h"
@@ -21,6 +14,7 @@
 
 #include "wizard_network.h"
 
+// @TODO: Make it not a console app for windows release mode.
 int main(int argc, char**argv ) {
     // raylib
     int screen_width = 1024;
@@ -41,6 +35,7 @@ int main(int argc, char**argv ) {
         client_update(&client, time);
 
         // @TODO: state stuff in our client
+        // @TODO: Learn the netcode client lifecycle
         if (netcode_client_state(client.netcode_client) == NETCODE_CLIENT_STATE_CONNECTED) {
             char *data;
             size_t size;
