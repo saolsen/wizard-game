@@ -1,15 +1,16 @@
 #ifndef _wizard_message_h
 #define _wizard_message_h
 
-// gonna use mpack because it should make this a lot easier.
+// Gonna use mpack because it should make this a lot easier.
 // @Optomize: Something with better compression for our specific use cases.
 #include "mpack.h"
 
 typedef enum {
-    PlayerConnected,      // Sent by the server to all connected clients when someone joins the game.
-    PlayerDisconnected,   // Sent by the server to all connected clients when someone leaves the game.
-    CurrentPlayerState,   // Sent regulary by the server to update clients on players positions.
-    Wave,                 // Sent by the server to all connected clients when someone waves.
+    MT_Null,
+    MT_PlayerConnected,      // Sent by the server to all connected clients when someone joins the game.
+    MT_PlayerDisconnected,   // Sent by the server to all connected clients when someone leaves the game.
+    MT_CurrentPlayerState,   // Sent regulary by the server to update clients on players positions.
+    MT_PlayerWave,           // Sent by the server to all connected clients when someone waves.
 } MessageType;
 
 typedef struct {
@@ -18,67 +19,136 @@ typedef struct {
     char *player_name;
 } PlayerConnectedMessage;
 
-// Serializes msg, data will be the serialized version and size will be it's size.
-// @Q: How do we handle the memory needed for this kind of stuff.
-// Need to really give that some thought.
-// If I do like a message union thing I could fill in a statically allocated message and serialize it. That's a neat option.
-// if serialization was tied to sending of messages too this could be neater with memory.
-// maybe even macros that take a struct initializer? Lets me do defaults and stuff too?
+typedef struct {
+    MessageType type;
+    int player_index;
+} PlayerDisconnectedMessage;
 
-// We're gonna use msgpack arrays, it's actually a little overkill because we know how many elements we have always
-// but whatever, it lets us use this lib and can generically unserialize stuff if we want to also.
-int message_player_connected_serialize(PlayerConnectedMessage msg, uint8_t **data, size_t *size)
-{
-    // Gonna start by encoding shit as maps. This is not efficiant but could be really nice if I want to maybe visualize some of this shit
-    // in flight? I dunno, @TODO: look into direct struct encoding.
+typedef struct {
+    MessageType type;
+    float player_positions[32*2]; // x and y for all 32 possible players.
+} CurrentPlayerStateMessage;
+
+typedef struct {
+    MessageType type;
+    int player_index;
+} PlayerWaveMessage;
+
+// @Q: Is there a better way to do this? I could embed them all manually but that's annoying to remember which fields
+// go in which. I could metaprogram that I guess.
+typedef union {
+    PlayerConnectedMessage _pcm;
+    PlayerDisconnectedMessage _pdm;
+    CurrentPlayerStateMessage _cpsm;
+    PlayerWaveMessage _pwm;
+} MessageStorage;
+
+
+// @OPTIMIZATION: I could just metaprogram these functions from the struct definitions above.
+int message_serialize(MessageStorage *message, uint8_t **data, size_t *size)
+{   
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, data, size);
 
-    mpack_start_array(&writer, 3);
-    mpack_write_int(&writer, msg.type);
-    mpack_write_int(&writer, msg.player_index);
-    mpack_write_cstr(&writer, msg.player_name);
-    mpack_finish_array(&writer);
+    switch(*(MessageType*)message) {
+        case MT_Null:
+            return 1;
+        case MT_PlayerConnected: {
+            PlayerConnectedMessage *msg = (PlayerConnectedMessage*)message;
+            mpack_start_array(&writer, 3);
+            mpack_write_int(&writer, msg->type);
+            mpack_write_int(&writer, msg->player_index);
+            mpack_write_cstr(&writer, msg->player_name);
+            mpack_finish_array(&writer);
+        } break;
+        case MT_PlayerDisconnected: {
+            PlayerDisconnectedMessage *msg = (PlayerDisconnectedMessage*)message;
+            mpack_start_array(&writer, 2);
+            mpack_write_int(&writer, msg->type);
+            mpack_write_int(&writer, msg->player_index);
+            mpack_finish_array(&writer);
+        } break;
+        case MT_CurrentPlayerState: {
+            CurrentPlayerStateMessage *msg = (CurrentPlayerStateMessage*)message;
+            mpack_start_array(&writer, 2);
+            mpack_write_int(&writer, msg->type);
+            mpack_start_array(&writer, 32 * 2);
+            for (int i=0; i<32*2; i++) {
+                mpack_write_float(&writer, msg->player_positions[i]);
+            }
+            mpack_finish_array(&writer);
+            mpack_finish_array(&writer);
+        } break;
+        case MT_PlayerWave: {
+            PlayerWaveMessage *msg = (PlayerWaveMessage*)message;
+            mpack_start_array(&writer, 2);
+            mpack_write_int(&writer, msg->type);
+            mpack_write_int(&writer, msg->player_index);
+            mpack_finish_array(&writer);
+        } break;
+    }
 
     if (mpack_writer_destroy(&writer) != mpack_ok) {
         printf("Error encoding data, :(\n");
+        return 1;
     }
 
-    //client_packet_send(&client, data, (uint32_t)size);
-    
-    // when do we free(data)?
     return 0;
 }
 
-PlayerConnectedMessage message_player_connected_deserialize(uint8_t *data, size_t size)
+MessageType message_deserialize(uint8_t *data, size_t size, MessageStorage *message)
 {
-    PlayerConnectedMessage result;
-
     mpack_reader_t reader;
     mpack_reader_init_data(&reader, data, size);
 
     mpack_expect_array(&reader);
-    result.type = mpack_expect_int(&reader);
-    result.player_index = mpack_expect_int(&reader);
-    result.player_name = mpack_expect_cstr_alloc(&reader, 1024);
-    mpack_done_array(&reader);
+    MessageType *message_type = (MessageType*)message;
+    *message_type = (MessageType)mpack_expect_int(&reader);
 
+    switch(*message_type) {
+        case MT_Null:
+            return 1;
+        case MT_PlayerConnected: {
+            PlayerConnectedMessage *msg = (PlayerConnectedMessage*)message;
+            msg->player_index = mpack_expect_int(&reader);
+            msg->player_name = mpack_expect_cstr_alloc(&reader, 1024);
+        } break;
+        case MT_PlayerDisconnected: {
+            PlayerDisconnectedMessage *msg = (PlayerDisconnectedMessage*)message;
+            msg->player_index = mpack_expect_int(&reader);
+        } break;
+        case MT_CurrentPlayerState: {
+            CurrentPlayerStateMessage *msg = (CurrentPlayerStateMessage*)message;
+            mpack_expect_array(&reader);
+            for (int i=0; i<32*2; i++) {
+                msg->player_positions[i] = mpack_expect_float(&reader);
+            }
+            mpack_done_array(&reader);
+        } break;
+        case MT_PlayerWave: {
+            PlayerWaveMessage *msg = (PlayerWaveMessage*)message;
+            msg->player_index = mpack_expect_int(&reader);
+        } break;
+    }
+    
+    mpack_done_array(&reader);
     mpack_reader_destroy(&reader);
 
-    return result;
+    return *message_type;
 }
-
+// @Q: Is there a way to do the isreading/iswriting thing with msgpack so they don't get out of sync?
 
 #endif //_wizard_message_h
 
 #ifdef WIZARD_TESTING
 
 TEST test_serialize_deserialize(void) {
-    PlayerConnectedMessage message = {.type = PlayerConnected, .player_index=12, .player_name="Steben"};
+    PlayerConnectedMessage message = {.type = MT_PlayerConnected, .player_index=12, .player_name="Steben"};
     uint8_t *data = NULL;
     size_t s;
-    message_player_connected_serialize(message, &data, &s);
-    PlayerConnectedMessage result = message_player_connected_deserialize(data, s);
+    message_serialize((MessageStorage*)&message, &data, &s);
+    PlayerConnectedMessage result;
+    MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
     ASSERT_EQ(message.type, result.type);
     ASSERT_EQ(message.player_index, result.player_index);
     ASSERT_FALSE(strcmp(message.player_name, result.player_name));

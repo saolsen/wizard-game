@@ -1,18 +1,16 @@
-#include "netcode.h"
-#include "reliable.h"
-#include "mpack.h"
-
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
 #include <stdbool.h>
 #include <inttypes.h>
+#include <malloc.h>
 
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
 #include "wizard_network.h"
+#include "wizard_message.h"
 
 // @TODO: Make it not a console app for windows release mode.
 int main(int argc, char**argv ) {
@@ -92,7 +90,7 @@ int main(int argc, char**argv ) {
 
     client_destroy(&client);
     CloseWindow();
-    printf("Press any key to continue...");
-    getch();
+    
+    
     return 0;
 }

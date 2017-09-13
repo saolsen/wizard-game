@@ -1,6 +1,7 @@
 #ifndef _wizard_network_h
 #define _wizard_network_h
 
+#include <malloc.h>
 #include <inttypes.h>
 #include <stdint.h>
 

@@ -1,34 +1,12 @@
-// This is the dedicated server for wizard-game. It only targets linux (because it will use a lot of linux features) and
-// has a client on port 40000 which is a UDP netcode.io server.
-// It's probably gonna def have startup hooks and shit for auth since I want to launch these on demand.
-
-// Goals for v1
-// let clients emit chat messages, relay those messages to all other connected clients
-// store a position for clients, they are gonna walk around.
-
-// later
-// emit events for shit that can be dtrace style traced
-// save all state that happens to a sqlite database in such a way that it can be replayed (wow).
-// ball harder
-
-// There's like other shit that has to happen on start and end.
-// on start we need the right creds and a list of users and stuff. (maybe)
-// on teardown (if it's prod) we need to copy the sqlite log somewhere, prolly manta if we're on triton or s3 or whatever.
-
-// honestly imma prolly try to get this on aws.
-// digital ocean sounds really great too....
-
-#include "netcode.h"
-#include "reliable.h"
-#include "mpack.h"
-
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
 #include <signal.h>
 #include <inttypes.h>
+#include <malloc.h>
 
 #include "wizard_network.h"
+#include "wizard_message.h"
 
 static volatile int quit = 0;
 
