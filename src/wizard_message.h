@@ -142,17 +142,55 @@ MessageType message_deserialize(uint8_t *data, size_t size, MessageStorage *mess
 
 #ifdef WIZARD_TESTING
 
+// @TODO: Make this a property test.
 TEST test_serialize_deserialize(void) {
-    PlayerConnectedMessage message = {.type = MT_PlayerConnected, .player_index=12, .player_name="Steben"};
     uint8_t *data = NULL;
     size_t s;
-    message_serialize((MessageStorage*)&message, &data, &s);
-    PlayerConnectedMessage result;
-    MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
-    ASSERT_EQ(message.type, result.type);
-    ASSERT_EQ(message.player_index, result.player_index);
-    ASSERT_FALSE(strcmp(message.player_name, result.player_name));
-    free(data); // @TODO: figure out how you're really gonna manage memory.
+    {
+        PlayerConnectedMessage message = {.type = MT_PlayerConnected, .player_index=12, .player_name="Steben"};
+        message_serialize((MessageStorage*)&message, &data, &s);
+        PlayerConnectedMessage result;
+        MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
+        ASSERT_EQ(message.type, result.type);
+        ASSERT_EQ(message.player_index, result.player_index);
+        ASSERT_FALSE(strcmp(message.player_name, result.player_name));
+        free(data); // @TODO: figure out how you're really gonna manage memory.
+    }
+    {
+        PlayerDisconnectedMessage message = {.type = MT_PlayerDisconnected, .player_index=100};
+        message_serialize((MessageStorage*)&message, &data, &s);
+        PlayerDisconnectedMessage result;
+        MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
+        ASSERT_EQ(message.type, result.type);
+        ASSERT_EQ(message.player_index, result.player_index);
+        free(data);
+    }
+    {
+        CurrentPlayerStateMessage message = {
+            .type = MT_CurrentPlayerState,
+            .player_positions = {1}
+        };
+        message_serialize((MessageStorage*)&message, &data, &s);
+        CurrentPlayerStateMessage result;
+        MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
+        ASSERT_EQ(message.type, result.type);
+        for (int i=0; i<32*2; i++) {
+            ASSERT_EQ(message.player_positions[i], result.player_positions[i]);
+        }
+        free(data);
+    }
+    {
+        PlayerWaveMessage message = {
+            .type = MT_PlayerWave,
+            .player_index = 44
+        };
+        message_serialize((MessageStorage*)&message, &data, &s);
+        PlayerWaveMessage result;
+        MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
+        ASSERT_EQ(message.type, result.type);
+        ASSERT_EQ(message.player_index, result.player_index);
+        free(data);
+    }
     PASS();
 }
 

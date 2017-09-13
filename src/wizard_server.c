@@ -43,6 +43,10 @@ int main(int argc, char **argv)
             server_packet_send(&server, 0, packet_data, NETCODE_MAX_PACKET_SIZE);
         }
 
+        // server_clients_connected_this_tick(); array of indexes, and a length
+        // server_clients_disconnected_this_tick(); array of indexes and a length
+        // server_clients_connected(); array of indexes and a length
+
         int client_index;
         for (client_index = 0; client_index < MAX_CONNECTED_CLIENTS; ++client_index) {
             for (;;) {
@@ -52,7 +56,7 @@ int main(int argc, char **argv)
                 if (!packet) { break; }
 
                 if (packet_size != NETCODE_MAX_PACKET_SIZE) {
-                    printf("received a packet from client %i\n", client_index);
+                    //printf("received a packet from client %i\n", client_index);
                     
                     mpack_reader_t reader;
                     mpack_reader_init_data(&reader, packet, packet_size);
@@ -71,14 +75,19 @@ int main(int argc, char **argv)
 
                     mpack_reader_destroy(&reader);
 
-                    fprintf(stderr, "{%s: %s, %s: %u}\n", key1, (b ? "true" : "false"), key2, i);
+                    //fprintf(stderr, "{%s: %s, %s: %u}\n", key1, (b ? "true" : "false"), key2, i);
                 }
 
                 server_packet_free(&server);
             }
         }
 
+        // give me a list of new clients who connected this frame
+        // give me a list of clients that disconnected this frame
+        // handle all that.
+
         // @Q: What does this really do?
+        fflush(stdout);
         netcode_sleep(delta_time);
         time += delta_time;
     }

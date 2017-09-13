@@ -31,6 +31,48 @@ typedef struct {
 int _client_process_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size);
 void _client_transmit_packet_function(void *_context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size);
 
+char *my_netcode_client_state_name(int state)
+{
+    switch(state) {
+    case NETCODE_CLIENT_STATE_CONNECT_TOKEN_EXPIRED:
+        return "NETCODE_CLIENT_STATE_CONNECT_TOKEN_EXPIRED";
+    case NETCODE_CLIENT_STATE_INVALID_CONNECT_TOKEN:
+            return "NETCODE_CLIENT_STATE_INVALID_CONNECT_TOKEN";
+            
+        case NETCODE_CLIENT_STATE_CONNECTION_TIMED_OUT:
+            return "NETCODE_CLIENT_STATE_CONNECTION_TIMED_OUT";
+            
+        case NETCODE_CLIENT_STATE_CONNECTION_RESPONSE_TIMED_OUT:
+            return "NETCODE_CLIENT_STATE_CONNECTION_RESPONSE_TIMED_OUT";
+            
+        case NETCODE_CLIENT_STATE_CONNECTION_REQUEST_TIMED_OUT:
+            return "NETCODE_CLIENT_STATE_CONNECTION_REQUEST_TIMED_OUT";
+            
+        case NETCODE_CLIENT_STATE_CONNECTION_DENIED:
+            return "NETCODE_CLIENT_STATE_CONNECTION_DENIED";
+            
+        case NETCODE_CLIENT_STATE_DISCONNECTED:
+            return "NETCODE_CLIENT_STATE_DISCONNECTED";
+            
+        case NETCODE_CLIENT_STATE_SENDING_CONNECTION_REQUEST:
+            return "NETCODE_CLIENT_STATE_SENDING_CONNECTION_REQUEST";
+            
+        case NETCODE_CLIENT_STATE_SENDING_CONNECTION_RESPONSE:
+            return "NETCODE_CLIENT_STATE_SENDING_CONNECTION_RESPONSE";
+            
+        case NETCODE_CLIENT_STATE_CONNECTED:
+            return "NETCODE_CLIENT_STATE_CONNECTED";
+            
+    }
+}
+
+void _client_state_change_function(void* _context, int old_state, int new_state)
+{
+    printf("Client state changed from '%s' to '%s'\n",
+        my_netcode_client_state_name(old_state),
+        my_netcode_client_state_name(new_state));
+}
+
 int client_connect(NetworkClient *client, double time, uint8_t *connect_token) {
     if (netcode_init() != NETCODE_OK) {
         printf( "error: failed to initialize netcode.io\n" );
@@ -47,6 +89,7 @@ int client_connect(NetworkClient *client, double time, uint8_t *connect_token) {
         return 1;
     }
 
+    uint8_t default_connect_token[NETCODE_CONNECT_TOKEN_BYTES];
     if (!connect_token) {
         // Generate hardcoded test token for dev.
         NETCODE_CONST char *server_address = "127.0.0.1:40000";
@@ -55,17 +98,16 @@ int client_connect(NetworkClient *client, double time, uint8_t *connect_token) {
         netcode_random_bytes( (uint8_t*) &client_id, 8 );
         printf("client id is %.16" PRIx64 "\n", client_id);
 
-        uint8_t default_connect_token[NETCODE_CONNECT_TOKEN_BYTES];
-
         if (netcode_generate_connect_token( 1, &server_address, CONNECT_TOKEN_EXPIRY, CONNECT_TOKEN_TIMEOUT, client_id, PROTOCOL_ID, 0, private_key, default_connect_token) != NETCODE_OK) {
             printf("error: failed to generate connect token\n");
             return 1;
         }
-
-        netcode_client_connect(client->netcode_client, default_connect_token);
-    } else {
-        netcode_client_connect(client->netcode_client, connect_token);
+        connect_token = default_connect_token;   
     }
+
+    netcode_client_state_change_callback(client->netcode_client, client, &_client_state_change_function);
+
+    netcode_client_connect(client->netcode_client, default_connect_token);
 
     // @TODO: Check result
 
@@ -149,16 +191,27 @@ void client_destroy(NetworkClient *client)
 typedef struct {
     double time;
     struct netcode_server_t *netcode_server;
+    
+    // State stored per connected client. Index this by server slot.
     struct reliable_endpoint_t* reliable_endpoints[MAX_CONNECTED_CLIENTS];
+    uint64_t client_ids[MAX_CONNECTED_CLIENTS];
+    // @OPTOIMIZE: Add a hash from client_id to index so it's faster to look up a client id.
 
     void* current_packet;
     uint32_t current_packet_size;
     uint16_t current_packet_sequence;
     uint8_t *current_packet_data;
+
+    
 } NetworkServer;
 
 int _server_process_packet_function(void *_context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size);
 void _server_transmit_packet_function(void *_context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size);
+
+void _server_connect_disconnect_function(void *_context, int client_index, int connected)
+{
+    printf("Hello, this is the connect disconnect callback, client '%i' has %s\n", client_index, connected ? "connected" : "disconnected");
+}
 
 // @TODO: There's a lot more to this for having real clients.
 // There's a private key and protocol id and a bunch of other stuff.
@@ -184,17 +237,25 @@ int server_run(NetworkServer *server, double time)
     }
 
     reliable_init();
+
+    netcode_server_connect_disconnect_callback(server->netcode_server, server, &_server_connect_disconnect_function);
+
     // @TODO: figure out how you tell when there's a new client connected.
     netcode_server_start(server->netcode_server, MAX_CONNECTED_CLIENTS);
     return 0;
 }
 
+// Called at the beginning of the frame with the current time.
 void server_update(NetworkServer *server, double time) {
     server->time = time;
     netcode_server_update(server->netcode_server, time);
     // @TODO: Update reliable endpoints too.
     //reliable_endpoint_update(client->reliable_endpoint, time);
 }
+
+void server_clients_connected_this_tick(NetworkServer *server, uint64_t *client_ids, int num_client_ids);
+void server_clients_disconnected_this_tick(NetworkServer *server, uint64_t *client_ids, int num_client_ids);
+void server_clients_connected(NetworkServer *server, uint64_t *client_ids, int num_client_ids);
 
 struct wrapped_server {
     NetworkServer *server;

@@ -12,6 +12,8 @@
 #include "wizard_network.h"
 #include "wizard_message.h"
 
+void _state_change_callback(void* , int, int);
+
 // @TODO: Make it not a console app for windows release mode.
 int main(int argc, char**argv ) {
     // raylib
@@ -29,8 +31,23 @@ int main(int argc, char**argv ) {
 
     client_connect(&client, time, NULL);
 
+    bool am_connected = false;
+
     while (!WindowShouldClose()) {
         client_update(&client, time);
+
+        if (netcode_client_state(client.netcode_client) == NETCODE_CLIENT_STATE_CONNECTED) {
+            if (!am_connected) {
+                am_connected = true;
+                printf("I just noticed I'm connected now.\n");
+            }
+        }
+        if (netcode_client_state(client.netcode_client) != NETCODE_CLIENT_STATE_CONNECTED) {
+            if (am_connected) {
+                am_connected = false;
+                printf("I just noticed I'm not connected now.\n");
+            }
+        }
 
         // @TODO: state stuff in our client
         // @TODO: Learn the netcode client lifecycle
@@ -60,7 +77,7 @@ int main(int argc, char**argv ) {
         uint32_t packet_size;
         uint64_t packet_sequence;
         while (packet = client_packet_receive(&client, &packet_size, &packet_sequence)) {
-            printf("We got a packet!\n");
+            //printf("We got a packet!\n");
         }
 
         //if (netcode_client_state(client) <= NETCODE_CLIENT_STATE_DISCONNECTED) {};
