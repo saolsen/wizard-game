@@ -65,22 +65,29 @@ int main(int argc, char **argv)
     while (!quit) {
         server_update(&server, time);
 
-        // give me a list of new clients who connected this frame
-        // give me a list of clients that disconnected this frame
-        // handle all that.
-
         uint64_t client_id;
         while(dequeue(server.client_connects, LEN(server.client_connects), &server.client_connects_head, &server.client_connects_tail, &client_id)) {
             printf("[server] Client '%.16" PRIx64 "' has connected\n", client_id);
+            gamestate->connected_clients[gamestate->num_connected_clients++] = client_id;
         }
         
         while(dequeue(server.client_disconnects, LEN(server.client_disconnects), &server.client_disconnects_head, &server.client_disconnects_tail, &client_id)) {
             printf("[server] Client '%.16" PRIx64 "' has disconnected\n", client_id);
+
+            uint64_t last_id = 0;
+            for (int i = gamestate->num_connected_clients - 1; i <= 0; i--) {
+                uint64_t id = gamestate->connected_clients[i];
+                gamestate->connected_clients[i] = last_id;
+                last_id = id;
+                if (id == client_id) {
+                    break;
+                }
+            }
+            gamestate->num_connected_clients--;
         }
 
-        for (int i=0; i < MAX_CONNECTED_CLIENTS; i++) {
-            uint64_t client_id = server.client_ids[i];
-            if (!client_id) { break; }
+        for (int i=0; i < gamestate->num_connected_clients; i++) {
+            uint64_t client_id = gamestate->connected_clients[i];
 
             server_packet_send(&server, client_id, packet_data, NETCODE_MAX_PACKET_SIZE);
 
