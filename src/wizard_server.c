@@ -1,3 +1,18 @@
+// stuff for wizard.h
+// push
+// pop
+// allocate_freelist
+// 
+
+// You need like 2 fucking things to program.
+// a stack
+// a ring buffer
+// stack is easy, just ++ --
+// ring buffer is a bit more complicated
+// array, put_index, get_index, some way to know if it's full...
+
+// sometimes ya need a map too and occasionally all those things have to grow.
+
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
@@ -35,24 +50,44 @@ int main(int argc, char **argv)
     for (i = 0; i < NETCODE_MAX_PACKET_SIZE; ++i)
         packet_data[i] = (uint8_t) i;
 
+    typedef struct {
+        uint64_t connected_clients[MAX_CONNECTED_CLIENTS];
+        int num_connected_clients;
+    } ServerGameState;
+
+    ServerGameState _gamestate = {
+        .connected_clients = {0},
+        .num_connected_clients = 0,
+    };
+
+    ServerGameState *gamestate = &_gamestate;
+
     while (!quit) {
         server_update(&server, time);
 
-        // @TODO: API for this or good way to write code like this.
-        if (netcode_server_client_connected(server.netcode_server, 0)) {
-            server_packet_send(&server, 0, packet_data, NETCODE_MAX_PACKET_SIZE);
+        // give me a list of new clients who connected this frame
+        // give me a list of clients that disconnected this frame
+        // handle all that.
+
+        uint64_t client_id;
+        while(dequeue(server.client_connects, LEN(server.client_connects), &server.client_connects_head, &server.client_connects_tail, &client_id)) {
+            printf("[server] Client '%.16" PRIx64 "' has connected\n", client_id);
+        }
+        
+        while(dequeue(server.client_disconnects, LEN(server.client_disconnects), &server.client_disconnects_head, &server.client_disconnects_tail, &client_id)) {
+            printf("[server] Client '%.16" PRIx64 "' has disconnected\n", client_id);
         }
 
-        // server_clients_connected_this_tick(); array of indexes, and a length
-        // server_clients_disconnected_this_tick(); array of indexes and a length
-        // server_clients_connected(); array of indexes and a length
+        for (int i=0; i < MAX_CONNECTED_CLIENTS; i++) {
+            uint64_t client_id = server.client_ids[i];
+            if (!client_id) { break; }
 
-        int client_index;
-        for (client_index = 0; client_index < MAX_CONNECTED_CLIENTS; ++client_index) {
+            server_packet_send(&server, client_id, packet_data, NETCODE_MAX_PACKET_SIZE);
+
             for (;;) {
                 int packet_size;
                 uint64_t packet_sequence;
-                void *packet = server_packet_receive(&server, client_index, &packet_size, &packet_sequence);
+                void *packet = server_packet_receive(&server, client_id, &packet_size, &packet_sequence);
                 if (!packet) { break; }
 
                 if (packet_size != NETCODE_MAX_PACKET_SIZE) {
@@ -81,10 +116,6 @@ int main(int argc, char **argv)
                 server_packet_free(&server);
             }
         }
-
-        // give me a list of new clients who connected this frame
-        // give me a list of clients that disconnected this frame
-        // handle all that.
 
         // @Q: What does this really do?
         fflush(stdout);

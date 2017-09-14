@@ -1,3 +1,11 @@
+// Do 1 more pass of this, just check on initialization and teardown state.
+// I think this is just about good enough to write some basic test code againts.
+
+// Still @TODO
+// - Message based interface with reliable / non reliable.
+// - Use reliable.io to track packet acks and handle them.
+// - Handle splitted up big packets better.
+
 #ifndef _wizard_network_h
 #define _wizard_network_h
 
@@ -7,6 +15,40 @@
 
 #include "netcode.h"
 #include "reliable.h"
+
+#define LEN(e) (sizeof(e)/sizeof(e[0]))
+
+// @TODO: Pull this out in some way that it's useable other places too.
+// @OPTIMIZATION: Can use modulo and if power of 2 can use & (size=1) insetad of % size 
+int enqueue(uint64_t *data, int capacity, int *head, int *tail, uint64_t e) {
+    int next = *head+1;
+    if (next >= capacity) {
+        next = 0;
+    }
+    if (next == *tail) {
+        return -1;
+    }
+    data[*head] = e;
+    *head = next;
+    return 0;
+}
+
+// returns 0 if queue is empty or 1 if there's an element.
+// makes it easier to use in a while loop.
+// holy shit do I really need to figure out my return code life.
+// @TODO
+int dequeue(uint64_t *data, int capacity, int *head, int *tail, uint64_t *e) {
+    if (*head == *tail) { // empty
+        return 0;
+    }
+    int next = *tail + 1;
+    if (next >= capacity) {
+        next = 0;
+    }
+    *e = data[*tail];
+    *tail = next;
+    return 1;
+}
 
 static uint8_t private_key[NETCODE_KEY_BYTES] = { 0x60, 0x6a, 0xbe, 0x6e, 0xc9, 0x19, 0x10, 0xea, 
                                                   0x9a, 0x65, 0x62, 0xf6, 0x6f, 0x2b, 0x30, 0xe4, 
@@ -21,6 +63,7 @@ typedef struct {
     double time;
     struct netcode_client_t *netcode_client;
     struct reliable_endpoint_t *reliable_endpoint;
+    int connected;
 
     void* current_packet;
     uint32_t current_packet_size;
@@ -30,6 +73,7 @@ typedef struct {
 
 int _client_process_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size);
 void _client_transmit_packet_function(void *_context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size);
+void _client_state_change_function(void* _context, int old_state, int new_state);
 
 char *my_netcode_client_state_name(int state)
 {
@@ -37,40 +81,25 @@ char *my_netcode_client_state_name(int state)
     case NETCODE_CLIENT_STATE_CONNECT_TOKEN_EXPIRED:
         return "NETCODE_CLIENT_STATE_CONNECT_TOKEN_EXPIRED";
     case NETCODE_CLIENT_STATE_INVALID_CONNECT_TOKEN:
-            return "NETCODE_CLIENT_STATE_INVALID_CONNECT_TOKEN";
-            
-        case NETCODE_CLIENT_STATE_CONNECTION_TIMED_OUT:
-            return "NETCODE_CLIENT_STATE_CONNECTION_TIMED_OUT";
-            
-        case NETCODE_CLIENT_STATE_CONNECTION_RESPONSE_TIMED_OUT:
-            return "NETCODE_CLIENT_STATE_CONNECTION_RESPONSE_TIMED_OUT";
-            
-        case NETCODE_CLIENT_STATE_CONNECTION_REQUEST_TIMED_OUT:
-            return "NETCODE_CLIENT_STATE_CONNECTION_REQUEST_TIMED_OUT";
-            
-        case NETCODE_CLIENT_STATE_CONNECTION_DENIED:
-            return "NETCODE_CLIENT_STATE_CONNECTION_DENIED";
-            
-        case NETCODE_CLIENT_STATE_DISCONNECTED:
-            return "NETCODE_CLIENT_STATE_DISCONNECTED";
-            
-        case NETCODE_CLIENT_STATE_SENDING_CONNECTION_REQUEST:
-            return "NETCODE_CLIENT_STATE_SENDING_CONNECTION_REQUEST";
-            
-        case NETCODE_CLIENT_STATE_SENDING_CONNECTION_RESPONSE:
-            return "NETCODE_CLIENT_STATE_SENDING_CONNECTION_RESPONSE";
-            
-        case NETCODE_CLIENT_STATE_CONNECTED:
-            return "NETCODE_CLIENT_STATE_CONNECTED";
-            
+        return "NETCODE_CLIENT_STATE_INVALID_CONNECT_TOKEN";
+    case NETCODE_CLIENT_STATE_CONNECTION_TIMED_OUT:
+        return "NETCODE_CLIENT_STATE_CONNECTION_TIMED_OUT";
+    case NETCODE_CLIENT_STATE_CONNECTION_RESPONSE_TIMED_OUT:
+        return "NETCODE_CLIENT_STATE_CONNECTION_RESPONSE_TIMED_OUT";
+    case NETCODE_CLIENT_STATE_CONNECTION_REQUEST_TIMED_OUT:
+        return "NETCODE_CLIENT_STATE_CONNECTION_REQUEST_TIMED_OUT";
+    case NETCODE_CLIENT_STATE_CONNECTION_DENIED:
+        return "NETCODE_CLIENT_STATE_CONNECTION_DENIED";
+    case NETCODE_CLIENT_STATE_DISCONNECTED:
+        return "NETCODE_CLIENT_STATE_DISCONNECTED";
+    case NETCODE_CLIENT_STATE_SENDING_CONNECTION_REQUEST:
+        return "NETCODE_CLIENT_STATE_SENDING_CONNECTION_REQUEST";
+    case NETCODE_CLIENT_STATE_SENDING_CONNECTION_RESPONSE:
+        return "NETCODE_CLIENT_STATE_SENDING_CONNECTION_RESPONSE";
+    case NETCODE_CLIENT_STATE_CONNECTED:
+        return "NETCODE_CLIENT_STATE_CONNECTED";
     }
-}
-
-void _client_state_change_function(void* _context, int old_state, int new_state)
-{
-    printf("Client state changed from '%s' to '%s'\n",
-        my_netcode_client_state_name(old_state),
-        my_netcode_client_state_name(new_state));
+    return "UNKNOWN_STATE";
 }
 
 int client_connect(NetworkClient *client, double time, uint8_t *connect_token) {
@@ -79,6 +108,8 @@ int client_connect(NetworkClient *client, double time, uint8_t *connect_token) {
         return 1;
     }
     reliable_init();
+    client->reliable_endpoint = NULL;
+    client->connected = 0;
 
     netcode_log_level(NETCODE_LOG_LEVEL_INFO);
 
@@ -106,27 +137,54 @@ int client_connect(NetworkClient *client, double time, uint8_t *connect_token) {
     }
 
     netcode_client_state_change_callback(client->netcode_client, client, &_client_state_change_function);
-
     netcode_client_connect(client->netcode_client, default_connect_token);
 
-    // @TODO: Check result
-
-    struct reliable_config_t reliable_config;
-    reliable_default_config(&reliable_config);
-    reliable_config.fragment_above = 500; // @Q: What size do we use for this?
-    reliable_config.index = 0; // @Q: What is index.
-    reliable_config.process_packet_function = &_client_process_packet_function;
-    reliable_config.transmit_packet_function = &_client_transmit_packet_function;
-    reliable_config.context = client;
-    client->reliable_endpoint = reliable_endpoint_create(&reliable_config, time);
+    client->current_packet = NULL;
+    client->current_packet_size = 0;
+    client->current_packet_sequence = 0;
+    client->current_packet_data = NULL;
 
     return 0;
+}
+
+void _client_state_change_function(void* _context, int old_state, int new_state)
+{
+    NetworkClient *client = (NetworkClient*)_context;
+
+    printf("Client state changed from '%s' to '%s'\n",
+        my_netcode_client_state_name(old_state),
+        my_netcode_client_state_name(new_state));
+    
+        if (new_state == NETCODE_CLIENT_STATE_CONNECTED) {
+            client->connected = 1;
+            if (client->reliable_endpoint) {
+                reliable_endpoint_destroy(client->reliable_endpoint);
+            }
+
+            // Set up reliable
+            struct reliable_config_t reliable_config;
+            reliable_default_config(&reliable_config);
+            reliable_config.fragment_above = 500; // @Q: What size do we want for this?
+            reliable_config.index = 0;
+            reliable_config.process_packet_function = &_client_process_packet_function;
+            reliable_config.transmit_packet_function = &_client_transmit_packet_function;
+            reliable_config.context = client;
+            client->reliable_endpoint = reliable_endpoint_create(&reliable_config, client->time);
+        } else {
+            client->connected = 0;
+            if (client->reliable_endpoint) {
+                reliable_endpoint_destroy(client->reliable_endpoint);
+                client->reliable_endpoint = NULL;
+            }
+        }
 }
 
 void client_update(NetworkClient *client, double time) {
     client->time = time;
     netcode_client_update(client->netcode_client, time);
-    reliable_endpoint_update(client->reliable_endpoint, time);
+    if (client->connected) {
+        reliable_endpoint_update(client->reliable_endpoint, time);
+    }
 }
 
 int _client_process_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size)
@@ -140,17 +198,19 @@ int _client_process_packet_function(void* _context, int index, uint16_t sequence
 
 uint8_t *client_packet_receive(NetworkClient *client, uint32_t *packet_size, uint64_t *packet_sequence)
 {
+    if (!client->connected) { return NULL; }
+
     uint32_t packet_bytes;
     void *packet = netcode_client_receive_packet(client->netcode_client, &packet_bytes, packet_sequence);
-    if (!packet) {
-        return NULL;
-    }
+    if (!packet) { return NULL;}
     
-    // This unwraps the reliable stuff from the packet and calls our callback _client_process_packet_function
-    // which saves the packet to some temp vars in the client.
     client->current_packet = packet;
+    client->current_packet_size = 0;
+    client->current_packet_sequence = 0;
+    client->current_packet_data = NULL;
+    
     reliable_endpoint_receive_packet(client->reliable_endpoint, packet, packet_bytes);
-    // @TODO: Need to check if there's anything saved. If it's a partial these won't be set.
+    
     *packet_size = client->current_packet_size;
     *packet_sequence = client->current_packet_sequence;
     return client->current_packet_data;
@@ -181,8 +241,13 @@ void client_send_packets(NetworkClient *client)
 
 void client_destroy(NetworkClient *client)
 {
-    netcode_client_destroy(client->netcode_client);
+    if (client->reliable_endpoint) {
+        reliable_endpoint_destroy(client->reliable_endpoint);
+        client->reliable_endpoint = NULL;
+    }
     reliable_term();
+    netcode_client_destroy(client->netcode_client);
+    client->netcode_client = NULL;
     netcode_term();
 }
 
@@ -192,41 +257,41 @@ typedef struct {
     double time;
     struct netcode_server_t *netcode_server;
     
-    // State stored per connected client. Index this by server slot.
-    struct reliable_endpoint_t* reliable_endpoints[MAX_CONNECTED_CLIENTS];
+    // State stored per connected client. Indexed by server slot.
     uint64_t client_ids[MAX_CONNECTED_CLIENTS];
-    // @OPTOIMIZE: Add a hash from client_id to index so it's faster to look up a client id.
+    struct reliable_endpoint_t* reliable_endpoints[MAX_CONNECTED_CLIENTS];
 
     void* current_packet;
     uint32_t current_packet_size;
     uint16_t current_packet_sequence;
     uint8_t *current_packet_data;
 
-    
+    uint64_t client_connects[MAX_CONNECTED_CLIENTS];
+    int client_connects_head;
+    int client_connects_tail;
+
+    uint64_t client_disconnects[MAX_CONNECTED_CLIENTS];
+    int client_disconnects_head;
+    int client_disconnects_tail;
 } NetworkServer;
 
 int _server_process_packet_function(void *_context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size);
 void _server_transmit_packet_function(void *_context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size);
-
-void _server_connect_disconnect_function(void *_context, int client_index, int connected)
-{
-    printf("Hello, this is the connect disconnect callback, client '%i' has %s\n", client_index, connected ? "connected" : "disconnected");
-}
+void _server_connect_disconnect_function(void *_context, int client_index, int connected);
 
 // @TODO: There's a lot more to this for having real clients.
 // There's a private key and protocol id and a bunch of other stuff.
 // Once I get walk around and press button to wave, I'm gonna do real auth stuff and matchmaking.
 int server_run(NetworkServer *server, double time)
 {
+    server->time = time;
+
     if (netcode_init() != NETCODE_OK) {
         printf("Error: failed to initialize netcode.io\n");
         return 1;
     }
+    
     netcode_log_level(NETCODE_LOG_LEVEL_INFO);
-
-    for (int i=0; i<MAX_CONNECTED_CLIENTS; i++) {
-        server->reliable_endpoints[i] = NULL;
-    }
 
     // @HARDCODE
     char *server_address = "127.0.0.1:40000";
@@ -236,80 +301,117 @@ int server_run(NetworkServer *server, double time)
         return 1;
     }
 
+    for (int i=0; i<MAX_CONNECTED_CLIENTS; i++) {
+        server->client_ids[i] = 0;
+        server->reliable_endpoints[i] = NULL;
+    }
+
     reliable_init();
 
     netcode_server_connect_disconnect_callback(server->netcode_server, server, &_server_connect_disconnect_function);
-
-    // @TODO: figure out how you tell when there's a new client connected.
     netcode_server_start(server->netcode_server, MAX_CONNECTED_CLIENTS);
+
+    server->current_packet = NULL;
+    server->current_packet_size = 0;
+    server->current_packet_sequence = 0;
+    server->current_packet_data = NULL;
+
+    server->client_connects_head = 0;
+    server->client_connects_tail = 0;
+    server->client_disconnects_head = 0;
+    server->client_disconnects_tail = 0;
+    
     return 0;
 }
 
-// Called at the beginning of the frame with the current time.
-void server_update(NetworkServer *server, double time) {
-    server->time = time;
-    netcode_server_update(server->netcode_server, time);
-    // @TODO: Update reliable endpoints too.
-    //reliable_endpoint_update(client->reliable_endpoint, time);
-}
-
-void server_clients_connected_this_tick(NetworkServer *server, uint64_t *client_ids, int num_client_ids);
-void server_clients_disconnected_this_tick(NetworkServer *server, uint64_t *client_ids, int num_client_ids);
-void server_clients_connected(NetworkServer *server, uint64_t *client_ids, int num_client_ids);
-
-struct wrapped_server {
-    NetworkServer *server;
-    int client_index;
-};
-
-int _server_process_packet_function(void *_context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size)
+void _server_connect_disconnect_function(void *_context, int client_index, int connected)
 {
-    struct wrapped_server *wrap = (struct wrapped_server*)_context;
-    wrap->server->current_packet_size = packet_size;
-    wrap->server->current_packet_sequence = sequence;
-    wrap->server->current_packet_data = packet_data;
-    return 0;
-}
+    NetworkServer *server = (NetworkServer*)_context;
 
-// @BUG: Playing real loose with memory here, gotta figure out how to actually manage and free the different parts.
-uint8_t *server_packet_receive(NetworkServer *server, int client_index, uint32_t *packet_size, uint64_t *packet_sequence)
-{
-    // @TODO: This is really janky. Think through the lifecycle of client connections and create the state
-    // correctly. (like probably not here, only clearing if there's a request ask with disconnected client is bad)
-    // figure out how to really learn a new client is connected through netcode.
-    if (!netcode_server_client_connected(server->netcode_server, client_index)) {
-        if (server->reliable_endpoints[client_index] != NULL) {
-            //@TODO: free(server->reliable_endpoints[client_index].context);
-            reliable_endpoint_destroy(server->reliable_endpoints[client_index]);
-            server->reliable_endpoints[client_index] = NULL;
-        }
-        return NULL;
-    }
-
-    if (!server->reliable_endpoints[client_index]) {
-        // Create reliable endpoint. @TODO: again, this is really not the place for this.
+    if (connected) {
+        uint64_t client_id = netcode_server_client_id(server->netcode_server, client_index);
+        server->client_ids[client_index] = client_id;
+        enqueue(server->client_connects, LEN(server->client_connects), &server->client_connects_head, &server->client_connects_tail, client_id);
+        
         struct reliable_config_t reliable_config;
         reliable_default_config(&reliable_config);
         reliable_config.fragment_above = 500;
         reliable_config.index = 0;
         reliable_config.process_packet_function = &_server_process_packet_function;
         reliable_config.transmit_packet_function = &_server_transmit_packet_function;
-        struct wrapped_server *wrap = malloc(sizeof(*wrap));
-        wrap->server = server;
-        wrap->client_index = client_index;
-        reliable_config.context = wrap;
+        reliable_config.context = server;
+        reliable_config.index = client_index;
         server->reliable_endpoints[client_index] = reliable_endpoint_create(&reliable_config, server->time);
+    } else {
+        uint64_t client_id = server->client_ids[client_index];
+        server->client_ids[client_index] = 0;
+
+        enqueue(server->client_disconnects, LEN(server->client_disconnects), &server->client_disconnects_head, &server->client_disconnects_tail, client_id);
+        
+        reliable_endpoint_destroy(server->reliable_endpoints[client_index]);
+        server->reliable_endpoints[client_index] = NULL;
     }
 
-    uint32_t packet_bytes;
-    void *packet = netcode_server_receive_packet(server->netcode_server, client_index, &packet_bytes, packet_sequence);
-    if (!packet) { return NULL; }
-    server->current_packet = packet;
-    reliable_endpoint_receive_packet(server->reliable_endpoints[client_index], packet, packet_bytes);
-    // @TODO: Need to check if there's anything saved. If it's a partial these won't be set.
-    *packet_size = server->current_packet_size;
-    *packet_sequence = server->current_packet_sequence;
-    return server->current_packet_data;
+}
+
+// Called at the beginning of the frame with the current time.
+void server_update(NetworkServer *server, double time) {
+    server->time = time;
+    netcode_server_update(server->netcode_server, time);
+    for (int client_index = 0; client_index < MAX_CONNECTED_CLIENTS; client_index++) {
+        if (server->client_ids[client_index]) {
+            reliable_endpoint_update(server->reliable_endpoints[client_index], time);
+        }
+    }
+}
+
+int server_client_connects(NetworkServer *server, int *client_index, uint64_t *client_id)
+{
+    return 0;
+}
+
+int server_client_disconnects(NetworkServer *server, int *client_index, uint64_t *client_id)
+{
+    return 0;
+}
+
+int server_clients(NetworkServer *server, int *client_index, uint64_t *client_id)
+{
+    return 0;
+}
+
+int _server_process_packet_function(void *_context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size)
+{
+    NetworkServer *server = (NetworkServer*)_context;
+    server->current_packet_size = packet_size;
+    server->current_packet_sequence = sequence;
+    server->current_packet_data = packet_data;
+    return 0;
+}
+
+// @BUG: Playing real loose with memory here, gotta figure out how to actually manage and free the different parts.
+uint8_t *server_packet_receive(NetworkServer *server, uint64_t client_id, uint32_t *packet_size, uint64_t *packet_sequence)
+{
+    for (int client_index = 0; client_index < MAX_CONNECTED_CLIENTS; client_index++) {
+        if (server->client_ids[client_index] == client_id) {
+            uint32_t packet_bytes;
+            void *packet = netcode_server_receive_packet(server->netcode_server, client_index, &packet_bytes, packet_sequence);
+            if (!packet) { return NULL; }
+
+            server->current_packet = packet;
+            server->current_packet_size = 0;
+            server->current_packet_sequence = 0;
+            server->current_packet_data = NULL;
+    
+            reliable_endpoint_receive_packet(server->reliable_endpoints[client_index], packet, packet_bytes);
+
+            *packet_size = server->current_packet_size;
+            *packet_sequence = server->current_packet_sequence;
+            return server->current_packet_data;
+        }
+    }
+
+    return NULL;
 }
 
 void server_packet_free(NetworkServer *server)
@@ -322,49 +424,35 @@ void server_packet_free(NetworkServer *server)
 
 void _server_transmit_packet_function(void *_context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size)
 {
-    struct wrapped_server *wrap = (struct wrapped_server*)_context;
-    netcode_server_send_packet(wrap->server->netcode_server, wrap->client_index, packet_data, packet_size);
+    NetworkServer *server = (NetworkServer*)_context;
+    netcode_server_send_packet(server->netcode_server, index, packet_data, packet_size);
 }
 
 // @TODO: change to message based, message_send_reliable, message_send_unreliable, maybe also some broadcasting
 // stuff that makes it easy to send to all connected clients.
 // also like buffer broadcast that will resend all past messages to all newly connected clients.
-void server_packet_send(NetworkServer *server, int client_index, uint8_t *data, uint32_t size)
+
+void server_packet_send(NetworkServer *server, uint64_t client_id, uint8_t *data, uint32_t size)
 {
-    // @COPYPASTA: Same logic for creating reliable endpoint on the fly as above.
-    // Don't wanna do it like this.
-    if (!netcode_server_client_connected(server->netcode_server, client_index)) {
-        if (server->reliable_endpoints[client_index]) {
-            //@TODO: free(server->reliable_endpoints[client_index].context);
-            reliable_endpoint_destroy(server->reliable_endpoints[client_index]);
-            server->reliable_endpoints[client_index] = NULL;
+    for (int client_index = 0; client_index < MAX_CONNECTED_CLIENTS; client_index++) {
+        if (server->client_ids[client_index] == client_id) {
+            reliable_endpoint_send_packet(server->reliable_endpoints[client_index], data, size);
+            break;
         }
-        return;
     }
-
-    // @COPYPASTA
-    if (!server->reliable_endpoints[client_index]) {
-        // Create reliable endpoint. @TODO: again, this is really not the place for this.
-        struct reliable_config_t reliable_config;
-        reliable_default_config(&reliable_config);
-        reliable_config.fragment_above = 500;
-        reliable_config.index = 0;
-        reliable_config.process_packet_function = &_server_process_packet_function;
-        reliable_config.transmit_packet_function = &_server_transmit_packet_function;
-        struct wrapped_server *wrap = malloc(sizeof(*wrap));
-        wrap->server = server;
-        wrap->client_index = client_index;
-        reliable_config.context = wrap;
-        server->reliable_endpoints[client_index] = reliable_endpoint_create(&reliable_config, server->time);
-    }
-
-    reliable_endpoint_send_packet(server->reliable_endpoints[client_index], data, size);
 }
 
 void server_destroy(NetworkServer *server)
 {
-    netcode_server_destroy(server->netcode_server);
+    for (int client_index = 0; client_index < MAX_CONNECTED_CLIENTS; client_index++) {
+        if (server->reliable_endpoints[client_index]) {
+            reliable_endpoint_destroy(server->reliable_endpoints[client_index]);
+            server->reliable_endpoints[client_index] = NULL;
+        }
+    }
     reliable_term();
+    netcode_server_destroy(server->netcode_server);
+    server->netcode_server = NULL;
     netcode_term();
 }
 #endif

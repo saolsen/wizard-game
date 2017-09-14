@@ -36,22 +36,22 @@ int main(int argc, char**argv ) {
     while (!WindowShouldClose()) {
         client_update(&client, time);
 
-        if (netcode_client_state(client.netcode_client) == NETCODE_CLIENT_STATE_CONNECTED) {
-            if (!am_connected) {
-                am_connected = true;
-                printf("I just noticed I'm connected now.\n");
-            }
-        }
-        if (netcode_client_state(client.netcode_client) != NETCODE_CLIENT_STATE_CONNECTED) {
-            if (am_connected) {
-                am_connected = false;
-                printf("I just noticed I'm not connected now.\n");
-            }
-        }
+        // I like want to do all the callbacks now, but not as callbacks.
+        // So I need like a buffer to iterate.
 
-        // @TODO: state stuff in our client
-        // @TODO: Learn the netcode client lifecycle
-        if (netcode_client_state(client.netcode_client) == NETCODE_CLIENT_STATE_CONNECTED) {
+        /* int oldstate;
+        int newstate;
+        while (client_state_changes(client, &oldstate, &newstate)) {
+            if (newstate == NETCODE_CLIENT_STATE_CONNECTED) {
+                am_connected = true;
+                printf("Client has Connected\n");
+            } else if (newstate == NETCODE_CLIENT_STATE_DISCONNECTED) {
+                am_connected = false;
+                printf("Client has Disconnected\n");
+            }
+        } */
+
+        if (am_connected) {
             char *data;
             size_t size;
             mpack_writer_t writer;
