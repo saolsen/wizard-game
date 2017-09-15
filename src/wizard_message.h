@@ -15,23 +15,24 @@ typedef enum {
 
 typedef struct {
     MessageType type;
-    int player_index;
-    char *player_name;
+    uint64_t player_id;
 } PlayerConnectedMessage;
 
 typedef struct {
     MessageType type;
-    int player_index;
+    uint64_t player_id;
 } PlayerDisconnectedMessage;
 
 typedef struct {
     MessageType type;
+    uint64_t player_ids[32];
+    int num_players;
     float player_positions[32*2]; // x and y for all 32 possible players.
 } CurrentPlayerStateMessage;
 
 typedef struct {
     MessageType type;
-    int player_index;
+    uint64_t player_id;
 } PlayerWaveMessage;
 
 // @Q: Is there a better way to do this? I could embed them all manually but that's annoying to remember which fields
@@ -45,35 +46,39 @@ typedef union {
 
 
 // @OPTIMIZATION: I could just metaprogram these functions from the struct definitions above.
-int message_serialize(MessageStorage *message, uint8_t **data, size_t *size)
+int message_serialize(MessageStorage *message, uint8_t **data, uint32_t *size)
 {   
     mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, data, size);
+    mpack_writer_init_growable(&writer, data, (size_t*)size);
 
     switch(*(MessageType*)message) {
         case MT_Null:
             return 1;
         case MT_PlayerConnected: {
             PlayerConnectedMessage *msg = (PlayerConnectedMessage*)message;
-            mpack_start_array(&writer, 3);
+            mpack_start_array(&writer, 2);
             mpack_write_int(&writer, msg->type);
-            mpack_write_int(&writer, msg->player_index);
-            mpack_write_cstr(&writer, msg->player_name);
+            mpack_write_u64(&writer, msg->player_id);
             mpack_finish_array(&writer);
         } break;
         case MT_PlayerDisconnected: {
             PlayerDisconnectedMessage *msg = (PlayerDisconnectedMessage*)message;
             mpack_start_array(&writer, 2);
             mpack_write_int(&writer, msg->type);
-            mpack_write_int(&writer, msg->player_index);
+            mpack_write_u64(&writer, msg->player_id);
             mpack_finish_array(&writer);
         } break;
         case MT_CurrentPlayerState: {
             CurrentPlayerStateMessage *msg = (CurrentPlayerStateMessage*)message;
             mpack_start_array(&writer, 2);
             mpack_write_int(&writer, msg->type);
-            mpack_start_array(&writer, 32 * 2);
-            for (int i=0; i<32*2; i++) {
+            mpack_start_array(&writer, msg->num_players);
+            for (int i=0; i<msg->num_players; i++) {
+                mpack_write_u64(&writer, msg->player_ids[i]);
+            }
+            mpack_finish_array(&writer);
+            mpack_start_array(&writer, msg->num_players*2);
+            for (int i=0; i<msg->num_players*2; i++) {
                 mpack_write_float(&writer, msg->player_positions[i]);
             }
             mpack_finish_array(&writer);
@@ -83,7 +88,7 @@ int message_serialize(MessageStorage *message, uint8_t **data, size_t *size)
             PlayerWaveMessage *msg = (PlayerWaveMessage*)message;
             mpack_start_array(&writer, 2);
             mpack_write_int(&writer, msg->type);
-            mpack_write_int(&writer, msg->player_index);
+            mpack_write_u64(&writer, msg->player_id);
             mpack_finish_array(&writer);
         } break;
     }
@@ -110,24 +115,28 @@ MessageType message_deserialize(uint8_t *data, size_t size, MessageStorage *mess
             return 1;
         case MT_PlayerConnected: {
             PlayerConnectedMessage *msg = (PlayerConnectedMessage*)message;
-            msg->player_index = mpack_expect_int(&reader);
-            msg->player_name = mpack_expect_cstr_alloc(&reader, 1024);
+            msg->player_id = mpack_expect_u64(&reader);
         } break;
         case MT_PlayerDisconnected: {
             PlayerDisconnectedMessage *msg = (PlayerDisconnectedMessage*)message;
-            msg->player_index = mpack_expect_int(&reader);
+            msg->player_id = mpack_expect_u64(&reader);
         } break;
         case MT_CurrentPlayerState: {
             CurrentPlayerStateMessage *msg = (CurrentPlayerStateMessage*)message;
+            msg->num_players = mpack_expect_array(&reader);
+            for (int i=0; i<msg->num_players; i++) {
+                msg->player_ids[i] = mpack_expect_u64(&reader);
+            }
+            mpack_done_array(&reader);
             mpack_expect_array(&reader);
-            for (int i=0; i<32*2; i++) {
+            for (int i=0; i<msg->num_players*2; i++) {
                 msg->player_positions[i] = mpack_expect_float(&reader);
             }
             mpack_done_array(&reader);
         } break;
         case MT_PlayerWave: {
             PlayerWaveMessage *msg = (PlayerWaveMessage*)message;
-            msg->player_index = mpack_expect_int(&reader);
+            msg->player_id = mpack_expect_u64(&reader);
         } break;
     }
     
@@ -145,24 +154,23 @@ MessageType message_deserialize(uint8_t *data, size_t size, MessageStorage *mess
 // @TODO: Make this a property test.
 TEST test_serialize_deserialize(void) {
     uint8_t *data = NULL;
-    size_t s;
+    uint32_t s;
     {
-        PlayerConnectedMessage message = {.type = MT_PlayerConnected, .player_index=12, .player_name="Steben"};
+        PlayerConnectedMessage message = {.type = MT_PlayerConnected, .player_id=12};
         message_serialize((MessageStorage*)&message, &data, &s);
         PlayerConnectedMessage result;
         MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
         ASSERT_EQ(message.type, result.type);
-        ASSERT_EQ(message.player_index, result.player_index);
-        ASSERT_FALSE(strcmp(message.player_name, result.player_name));
+        ASSERT_EQ(message.player_id, result.player_id);
         free(data); // @TODO: figure out how you're really gonna manage memory.
     }
     {
-        PlayerDisconnectedMessage message = {.type = MT_PlayerDisconnected, .player_index=100};
+        PlayerDisconnectedMessage message = {.type = MT_PlayerDisconnected, .player_id=100};
         message_serialize((MessageStorage*)&message, &data, &s);
         PlayerDisconnectedMessage result;
         MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
         ASSERT_EQ(message.type, result.type);
-        ASSERT_EQ(message.player_index, result.player_index);
+        ASSERT_EQ(message.player_id, result.player_id);
         free(data);
     }
     {
@@ -174,7 +182,11 @@ TEST test_serialize_deserialize(void) {
         CurrentPlayerStateMessage result;
         MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
         ASSERT_EQ(message.type, result.type);
-        for (int i=0; i<32*2; i++) {
+        ASSERT_EQ(message.num_players, result.num_players);
+        for (int i=0; i<message.num_players; i++) {
+            ASSERT_EQ(message.player_ids[i], result.player_ids[i]);
+        }
+        for (int i=0; i<message.num_players*2; i++) {
             ASSERT_EQ(message.player_positions[i], result.player_positions[i]);
         }
         free(data);
@@ -182,13 +194,13 @@ TEST test_serialize_deserialize(void) {
     {
         PlayerWaveMessage message = {
             .type = MT_PlayerWave,
-            .player_index = 44
+            .player_id = 44
         };
         message_serialize((MessageStorage*)&message, &data, &s);
         PlayerWaveMessage result;
         MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
         ASSERT_EQ(message.type, result.type);
-        ASSERT_EQ(message.player_index, result.player_index);
+        ASSERT_EQ(message.player_id, result.player_id);
         free(data);
     }
     PASS();

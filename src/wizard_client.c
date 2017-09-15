@@ -36,22 +36,12 @@ int main(int argc, char**argv ) {
     while (!WindowShouldClose()) {
         client_update(&client, time);
 
-        // I like want to do all the callbacks now, but not as callbacks.
-        // So I need like a buffer to iterate.
+        // I don't think I really need this, but I do probably need to be sending some sort of message every frame
+        // to keep the connection alive.
 
-        /* int oldstate;
-        int newstate;
-        while (client_state_changes(client, &oldstate, &newstate)) {
-            if (newstate == NETCODE_CLIENT_STATE_CONNECTED) {
-                am_connected = true;
-                printf("Client has Connected\n");
-            } else if (newstate == NETCODE_CLIENT_STATE_DISCONNECTED) {
-                am_connected = false;
-                printf("Client has Disconnected\n");
-            }
-        } */
+        /* if (am_connected) {
+            // keepalive packet, gonna ditch this.
 
-        if (am_connected) {
             char *data;
             size_t size;
             mpack_writer_t writer;
@@ -71,13 +61,37 @@ int main(int argc, char**argv ) {
             client_packet_send(&client, data, (uint32_t)size);
             
             free(data);
-        }
+        } */
 
         uint8_t *packet;
         uint32_t packet_size;
         uint64_t packet_sequence;
         while (packet = client_packet_receive(&client, &packet_size, &packet_sequence)) {
-            //printf("We got a packet!\n");
+            if (packet_size != NETCODE_MAX_PACKET_SIZE) {
+                MessageStorage message_storage;
+                MessageType mt = message_deserialize(packet, packet_size, &message_storage);
+
+                switch(mt) {
+                    case MT_PlayerConnected: {
+                        PlayerConnectedMessage *message = (PlayerConnectedMessage*)&message_storage;
+                        printf("[msg] Client '%.16" PRIx64 "' has connected\n", message->player_id);
+                    } break;
+                    case MT_PlayerDisconnected: {
+                        PlayerDisconnectedMessage *message = (PlayerDisconnectedMessage*)&message_storage;
+                        printf("[msg] Client '%.16" PRIx64 "' has disconnected\n", message->player_id);
+                    } break;
+                    case MT_CurrentPlayerState: {
+                        CurrentPlayerStateMessage *message = (CurrentPlayerStateMessage*)&message_storage;
+                        // @TODO
+                    } break;
+                    case MT_PlayerWave: {
+                        PlayerWaveMessage *message = (PlayerWaveMessage*)&message_storage;
+                        printf("[msg] Client '%.16" PRIx64 "' waves\n", message->player_id);
+                    }
+                    default: break;
+                }
+            }
+            client_packet_free(&client);
         }
 
         //if (netcode_client_state(client) <= NETCODE_CLIENT_STATE_DISCONNECTED) {};
@@ -87,15 +101,20 @@ int main(int argc, char**argv ) {
         ClearBackground(RAYWHITE);
         DrawFPS(GetScreenWidth() - 75, 10);
 
-        //int frack = GuiButton((Rectangle) { 10, 10, GetScreenWidth()-10, GetScreenHeight()-10 }, FormatText("Hello World: %s", "fracker"));
-        //if (frack) {
-            //printf("U pressed it\n");
+        int frack = GuiButton((Rectangle) { 10, 10, GetScreenWidth()-20, GetScreenHeight()-20 }, FormatText("Press to %s", "wave"));
+        if (frack) {
+            printf("U pressed wave\n");
+            
+            PlayerWaveMessage m = {
+                .type = MT_PlayerWave,
+                .player_id = client.client_id
+            };
 
-            //int hello_packet_size = NETCODE_MAX_PACKET_SIZE;
-            //static char hello_packet[NETCODE_MAX_PACKET_SIZE] = "Hello";
-
-            //netcode_client_send_packet(client, hello_packet, sizeof(hello_packet));
-        //}
+            uint8_t *packet;
+            uint32_t packet_size;
+            message_serialize((MessageStorage*)&m, &packet, &packet_size);
+            client_packet_send(&client, packet, packet_size);
+        }
 
         EndDrawing();
         
@@ -107,7 +126,5 @@ int main(int argc, char**argv ) {
 
     client_destroy(&client);
     CloseWindow();
-    
-    
     return 0;
 }

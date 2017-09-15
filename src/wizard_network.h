@@ -64,6 +64,7 @@ typedef struct {
     struct netcode_client_t *netcode_client;
     struct reliable_endpoint_t *reliable_endpoint;
     int connected;
+    uint64_t client_id;
 
     void* current_packet;
     uint32_t current_packet_size;
@@ -128,6 +129,7 @@ int client_connect(NetworkClient *client, double time, uint8_t *connect_token) {
         uint64_t client_id = 0;
         netcode_random_bytes( (uint8_t*) &client_id, 8 );
         printf("client id is %.16" PRIx64 "\n", client_id);
+        client->client_id = client_id;
 
         if (netcode_generate_connect_token( 1, &server_address, CONNECT_TOKEN_EXPIRY, CONNECT_TOKEN_TIMEOUT, client_id, PROTOCOL_ID, 0, private_key, default_connect_token) != NETCODE_OK) {
             printf("error: failed to generate connect token\n");
@@ -241,6 +243,7 @@ void client_send_packets(NetworkClient *client)
 
 void client_destroy(NetworkClient *client)
 {
+    netcode_client_disconnect(client->netcode_client);
     if (client->reliable_endpoint) {
         reliable_endpoint_destroy(client->reliable_endpoint);
         client->reliable_endpoint = NULL;
