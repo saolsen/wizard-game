@@ -73,14 +73,14 @@ int main(int argc, char **argv)
             // broadcast to other connected clients
             // @TODO: would miss people if they both joined the same tick, probably gonna have a buffered broadcast channel for stuff like
             // this eventuially.
-            PlayerConnectedMessage m = {
+            Message m = {
                 .type = MT_PlayerConnected,
                 .player_id = client_id
             };
 
             uint8_t *packet;
-            uint32_t packet_size;
-            message_serialize((MessageStorage*)&m, &packet, &packet_size);
+            size_t packet_size;
+            message_serialize(&m, &packet, &packet_size);
 
             for (int i=0; i < gamestate->num_connected_clients; i++) {
                 uint64_t client_id = gamestate->connected_clients[i];
@@ -105,14 +105,14 @@ int main(int argc, char **argv)
             gamestate->num_connected_clients--;
 
             // broadcast
-            PlayerDisconnectedMessage m = {
+            Message m = {
                 .type = MT_PlayerDisconnected,
                 .player_id = client_id
             };
 
             uint8_t *packet;
-            uint32_t packet_size;
-            message_serialize((MessageStorage*)&m, &packet, &packet_size);
+            size_t packet_size;
+            message_serialize(&m, &packet, &packet_size);
 
             for (int i=0; i < gamestate->num_connected_clients; i++) {
                 uint64_t client_id = gamestate->connected_clients[i];
@@ -128,14 +128,14 @@ int main(int argc, char **argv)
             server_packet_send(&server, client_id, packet_data, NETCODE_MAX_PACKET_SIZE);
 
             for (;;) {
-                int packet_size;
+                size_t packet_size;
                 uint64_t packet_sequence;
                 void *packet = server_packet_receive(&server, client_id, &packet_size, &packet_sequence);
                 if (!packet) { break; }
 
                 if (packet_size != NETCODE_MAX_PACKET_SIZE) {
-                    MessageStorage message_storage;
-                    MessageType mt = message_deserialize(packet, packet_size, &message_storage);
+                    Message message;
+                    MessageType mt = message_deserialize(packet, packet_size, &message);
                     switch(mt) {
                         case MT_PlayerConnected: {
                             /* PlayerConnectedMessage *message = (PlayerConnectedMessage*)&message_storage;
@@ -150,13 +150,12 @@ int main(int argc, char **argv)
                             // @TODO */
                         } break;
                         case MT_PlayerWave: {
-                            PlayerWaveMessage *message = (PlayerWaveMessage*)&message_storage;
-                            printf("[msg] Client '%.16" PRIx64 "' waves\n", message->player_id);
+                            printf("[msg] Client '%.16" PRIx64 "' waves\n", message.player_id);
 
                             // broadcast to all other players!
                             for (int i=0; i < gamestate->num_connected_clients; i++) {
                                 uint64_t client_id = gamestate->connected_clients[i];
-                                if (client_id != message->player_id) {
+                                if (client_id != message.player_id) {
                                     server_packet_send(&server, client_id, packet, packet_size);
                                 }
                             }

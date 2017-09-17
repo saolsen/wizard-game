@@ -13,7 +13,7 @@ typedef enum {
     MT_PlayerWave,           // Sent by the server to all connected clients when someone waves.
 } MessageType;
 
-typedef struct {
+/* typedef struct {
     MessageType type;
     uint64_t player_id;
 } PlayerConnectedMessage;
@@ -33,44 +33,61 @@ typedef struct {
 typedef struct {
     MessageType type;
     uint64_t player_id;
-} PlayerWaveMessage;
+} PlayerWaveMessage; */
+
+// If I figure out how I wanna do memory management I can just have these all
+// be their own struct and just pass header pointers or something.
 
 // @Q: Is there a better way to do this? I could embed them all manually but that's annoying to remember which fields
 // go in which. I could metaprogram that I guess.
-typedef union {
-    PlayerConnectedMessage _pcm;
-    PlayerDisconnectedMessage _pdm;
-    CurrentPlayerStateMessage _cpsm;
-    PlayerWaveMessage _pwm;
-} MessageStorage;
+
+
+// @NOTE: Keep all the messages in the same structure to make it easy to work with them. Usually only a few of these are allocated
+// at a time so it's not a big deal. The over the wire format is compressed (see serialize / deserialize).
+
+// If I decide I can just pass an arena for messages and just allocate them on demand I can go back to 1 struct per mesasge type
+// and a switch on the type. That would actually be really nice to do. Can do dynamic sized shit that way too.
+typedef struct {
+    MessageType type;
+    union {
+        // Player Connected, Player Disconnected, Player Wave
+        struct {
+            uint64_t player_id;
+        };
+        // Current Player State
+        struct {
+            uint64_t player_ids[32];
+            int num_players;
+            float player_positions[32*2];
+        };
+    };
+} Message;
 
 
 // @OPTIMIZATION: I could just metaprogram these functions from the struct definitions above.
-int message_serialize(MessageStorage *message, uint8_t **data, uint32_t *size)
+int message_serialize(Message *message, uint8_t **data, size_t *size)
 {   
     mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, data, (size_t*)size);
+    mpack_writer_init_growable(&writer, data, size);
 
-    switch(*(MessageType*)message) {
+    Message *msg = message;
+    switch(message->type) {
         case MT_Null:
             return 1;
         case MT_PlayerConnected: {
-            PlayerConnectedMessage *msg = (PlayerConnectedMessage*)message;
             mpack_start_array(&writer, 2);
             mpack_write_int(&writer, msg->type);
             mpack_write_u64(&writer, msg->player_id);
             mpack_finish_array(&writer);
         } break;
         case MT_PlayerDisconnected: {
-            PlayerDisconnectedMessage *msg = (PlayerDisconnectedMessage*)message;
             mpack_start_array(&writer, 2);
             mpack_write_int(&writer, msg->type);
             mpack_write_u64(&writer, msg->player_id);
             mpack_finish_array(&writer);
         } break;
         case MT_CurrentPlayerState: {
-            CurrentPlayerStateMessage *msg = (CurrentPlayerStateMessage*)message;
-            mpack_start_array(&writer, 2);
+            mpack_start_array(&writer, 3);
             mpack_write_int(&writer, msg->type);
             mpack_start_array(&writer, msg->num_players);
             for (int i=0; i<msg->num_players; i++) {
@@ -85,7 +102,6 @@ int message_serialize(MessageStorage *message, uint8_t **data, uint32_t *size)
             mpack_finish_array(&writer);
         } break;
         case MT_PlayerWave: {
-            PlayerWaveMessage *msg = (PlayerWaveMessage*)message;
             mpack_start_array(&writer, 2);
             mpack_write_int(&writer, msg->type);
             mpack_write_u64(&writer, msg->player_id);
@@ -101,7 +117,7 @@ int message_serialize(MessageStorage *message, uint8_t **data, uint32_t *size)
     return 0;
 }
 
-MessageType message_deserialize(uint8_t *data, size_t size, MessageStorage *message)
+MessageType message_deserialize(uint8_t *data, size_t size, Message *message)
 {
     mpack_reader_t reader;
     mpack_reader_init_data(&reader, data, size);
@@ -110,19 +126,17 @@ MessageType message_deserialize(uint8_t *data, size_t size, MessageStorage *mess
     MessageType *message_type = (MessageType*)message;
     *message_type = (MessageType)mpack_expect_int(&reader);
 
+    Message *msg = message;
     switch(*message_type) {
         case MT_Null:
             return 1;
         case MT_PlayerConnected: {
-            PlayerConnectedMessage *msg = (PlayerConnectedMessage*)message;
             msg->player_id = mpack_expect_u64(&reader);
         } break;
         case MT_PlayerDisconnected: {
-            PlayerDisconnectedMessage *msg = (PlayerDisconnectedMessage*)message;
             msg->player_id = mpack_expect_u64(&reader);
         } break;
         case MT_CurrentPlayerState: {
-            CurrentPlayerStateMessage *msg = (CurrentPlayerStateMessage*)message;
             msg->num_players = mpack_expect_array(&reader);
             for (int i=0; i<msg->num_players; i++) {
                 msg->player_ids[i] = mpack_expect_u64(&reader);
@@ -135,7 +149,6 @@ MessageType message_deserialize(uint8_t *data, size_t size, MessageStorage *mess
             mpack_done_array(&reader);
         } break;
         case MT_PlayerWave: {
-            PlayerWaveMessage *msg = (PlayerWaveMessage*)message;
             msg->player_id = mpack_expect_u64(&reader);
         } break;
     }
@@ -154,33 +167,35 @@ MessageType message_deserialize(uint8_t *data, size_t size, MessageStorage *mess
 // @TODO: Make this a property test.
 TEST test_serialize_deserialize(void) {
     uint8_t *data = NULL;
-    uint32_t s;
+    size_t s;
     {
-        PlayerConnectedMessage message = {.type = MT_PlayerConnected, .player_id=12};
-        message_serialize((MessageStorage*)&message, &data, &s);
-        PlayerConnectedMessage result;
-        MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
+        Message message = {.type = MT_PlayerConnected, .player_id=12};
+        message_serialize(&message, &data, &s);
+        Message result;
+        MessageType mt = message_deserialize(data, s, &result);
         ASSERT_EQ(message.type, result.type);
         ASSERT_EQ(message.player_id, result.player_id);
         free(data); // @TODO: figure out how you're really gonna manage memory.
     }
     {
-        PlayerDisconnectedMessage message = {.type = MT_PlayerDisconnected, .player_id=100};
-        message_serialize((MessageStorage*)&message, &data, &s);
-        PlayerDisconnectedMessage result;
-        MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
+        Message message = {.type = MT_PlayerDisconnected, .player_id=100};
+        message_serialize(&message, &data, &s);
+        Message result;
+        MessageType mt = message_deserialize(data, s, &result);
         ASSERT_EQ(message.type, result.type);
         ASSERT_EQ(message.player_id, result.player_id);
         free(data);
     }
     {
-        CurrentPlayerStateMessage message = {
+        Message message = {
             .type = MT_CurrentPlayerState,
-            .player_positions = {1}
+            .num_players = 1,
+            .player_ids = {123, 0},
+            .player_positions = {1, 1, 0}
         };
-        message_serialize((MessageStorage*)&message, &data, &s);
-        CurrentPlayerStateMessage result;
-        MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
+        message_serialize(&message, &data, &s);
+        Message result;
+        MessageType mt = message_deserialize(data, s, &result);
         ASSERT_EQ(message.type, result.type);
         ASSERT_EQ(message.num_players, result.num_players);
         for (int i=0; i<message.num_players; i++) {
@@ -192,13 +207,13 @@ TEST test_serialize_deserialize(void) {
         free(data);
     }
     {
-        PlayerWaveMessage message = {
+        Message message = {
             .type = MT_PlayerWave,
             .player_id = 44
         };
-        message_serialize((MessageStorage*)&message, &data, &s);
-        PlayerWaveMessage result;
-        MessageType mt = message_deserialize(data, s, (MessageStorage*)&result);
+        message_serialize(&message, &data, &s);
+        Message result;
+        MessageType mt = message_deserialize(data, s, &result);
         ASSERT_EQ(message.type, result.type);
         ASSERT_EQ(message.player_id, result.player_id);
         free(data);

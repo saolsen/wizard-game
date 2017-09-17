@@ -19,14 +19,14 @@
 #define LEN(e) (sizeof(e)/sizeof(e[0]))
 
 // @TODO: Pull this out in some way that it's useable other places too.
-// @OPTIMIZATION: Can use modulo and if power of 2 can use & (size=1) insetad of % size 
+// @OPTIMIZATION: Can use modulo and if power of 2 can use & (size-1) insetad of % size 
 int enqueue(uint64_t *data, int capacity, int *head, int *tail, uint64_t e) {
     int next = *head+1;
     if (next >= capacity) {
         next = 0;
     }
     if (next == *tail) {
-        return -1;
+        return -1; // queue is full
     }
     data[*head] = e;
     *head = next;
@@ -67,7 +67,7 @@ typedef struct {
     uint64_t client_id;
 
     void* current_packet;
-    uint32_t current_packet_size;
+    size_t current_packet_size;
     uint16_t current_packet_sequence;
     uint8_t *current_packet_data;
 } NetworkClient;
@@ -192,17 +192,17 @@ void client_update(NetworkClient *client, double time) {
 int _client_process_packet_function(void* _context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size)
 {
     NetworkClient *client = (NetworkClient*)_context;
-    client->current_packet_size = packet_size;
+    client->current_packet_size = (size_t)packet_size;
     client->current_packet_sequence = sequence;
     client->current_packet_data = packet_data;
     return 0;
 }
 
-uint8_t *client_packet_receive(NetworkClient *client, uint32_t *packet_size, uint64_t *packet_sequence)
+uint8_t *client_packet_receive(NetworkClient *client, size_t *packet_size, uint64_t *packet_sequence)
 {
     if (!client->connected) { return NULL; }
 
-    uint32_t packet_bytes;
+    int packet_bytes;
     void *packet = netcode_client_receive_packet(client->netcode_client, &packet_bytes, packet_sequence);
     if (!packet) { return NULL;}
     
@@ -231,9 +231,9 @@ void _client_transmit_packet_function(void *_context, int index, uint16_t sequen
 
 // @TODO: this will be message_send_reliable and message_send_unreliable
 // @TODO: This will also only queue up sends.
-void client_packet_send(NetworkClient *client, uint8_t *data, uint32_t size)
+void client_packet_send(NetworkClient *client, uint8_t *data, size_t size)
 {
-    reliable_endpoint_send_packet(client->reliable_endpoint, data, size);
+    reliable_endpoint_send_packet(client->reliable_endpoint, data, (int)size);
 }
 
 void client_send_packets(NetworkClient *client)
@@ -265,7 +265,7 @@ typedef struct {
     struct reliable_endpoint_t* reliable_endpoints[MAX_CONNECTED_CLIENTS];
 
     void* current_packet;
-    uint32_t current_packet_size;
+    size_t current_packet_size;
     uint16_t current_packet_sequence;
     uint8_t *current_packet_data;
 
@@ -386,18 +386,18 @@ int server_clients(NetworkServer *server, int *client_index, uint64_t *client_id
 int _server_process_packet_function(void *_context, int index, uint16_t sequence, uint8_t *packet_data, int packet_size)
 {
     NetworkServer *server = (NetworkServer*)_context;
-    server->current_packet_size = packet_size;
+    server->current_packet_size = (size_t)packet_size;
     server->current_packet_sequence = sequence;
     server->current_packet_data = packet_data;
     return 0;
 }
 
 // @BUG: Playing real loose with memory here, gotta figure out how to actually manage and free the different parts.
-uint8_t *server_packet_receive(NetworkServer *server, uint64_t client_id, uint32_t *packet_size, uint64_t *packet_sequence)
+uint8_t *server_packet_receive(NetworkServer *server, uint64_t client_id, size_t *packet_size, uint64_t *packet_sequence)
 {
     for (int client_index = 0; client_index < MAX_CONNECTED_CLIENTS; client_index++) {
         if (server->client_ids[client_index] == client_id) {
-            uint32_t packet_bytes;
+            int packet_bytes;
             void *packet = netcode_server_receive_packet(server->netcode_server, client_index, &packet_bytes, packet_sequence);
             if (!packet) { return NULL; }
 
@@ -435,11 +435,11 @@ void _server_transmit_packet_function(void *_context, int index, uint16_t sequen
 // stuff that makes it easy to send to all connected clients.
 // also like buffer broadcast that will resend all past messages to all newly connected clients.
 
-void server_packet_send(NetworkServer *server, uint64_t client_id, uint8_t *data, uint32_t size)
+void server_packet_send(NetworkServer *server, uint64_t client_id, uint8_t *data, size_t size)
 {
     for (int client_index = 0; client_index < MAX_CONNECTED_CLIENTS; client_index++) {
         if (server->client_ids[client_index] == client_id) {
-            reliable_endpoint_send_packet(server->reliable_endpoints[client_index], data, size);
+            reliable_endpoint_send_packet(server->reliable_endpoints[client_index], data, (int)size);
             break;
         }
     }

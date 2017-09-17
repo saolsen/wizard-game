@@ -11,6 +11,7 @@
 
 #include "wizard_network.h"
 #include "wizard_message.h"
+#include "wizard_simulation.h"
 
 void _state_change_callback(void* , int, int);
 
@@ -64,29 +65,25 @@ int main(int argc, char**argv ) {
         } */
 
         uint8_t *packet;
-        uint32_t packet_size;
+        size_t packet_size;
         uint64_t packet_sequence;
         while (packet = client_packet_receive(&client, &packet_size, &packet_sequence)) {
             if (packet_size != NETCODE_MAX_PACKET_SIZE) {
-                MessageStorage message_storage;
-                MessageType mt = message_deserialize(packet, packet_size, &message_storage);
+                Message message;
+                MessageType mt = message_deserialize(packet, packet_size, &message);
 
                 switch(mt) {
                     case MT_PlayerConnected: {
-                        PlayerConnectedMessage *message = (PlayerConnectedMessage*)&message_storage;
-                        printf("[msg] Client '%.16" PRIx64 "' has connected\n", message->player_id);
+                        printf("[msg] Client '%.16" PRIx64 "' has connected\n", message.player_id);
                     } break;
                     case MT_PlayerDisconnected: {
-                        PlayerDisconnectedMessage *message = (PlayerDisconnectedMessage*)&message_storage;
-                        printf("[msg] Client '%.16" PRIx64 "' has disconnected\n", message->player_id);
+                        printf("[msg] Client '%.16" PRIx64 "' has disconnected\n", message.player_id);
                     } break;
                     case MT_CurrentPlayerState: {
-                        CurrentPlayerStateMessage *message = (CurrentPlayerStateMessage*)&message_storage;
                         // @TODO
                     } break;
                     case MT_PlayerWave: {
-                        PlayerWaveMessage *message = (PlayerWaveMessage*)&message_storage;
-                        printf("[msg] Client '%.16" PRIx64 "' waves\n", message->player_id);
+                        printf("[msg] Client '%.16" PRIx64 "' waves\n", message.player_id);
                     }
                     default: break;
                 }
@@ -105,14 +102,14 @@ int main(int argc, char**argv ) {
         if (frack) {
             printf("U pressed wave\n");
             
-            PlayerWaveMessage m = {
+            Message m = {
                 .type = MT_PlayerWave,
                 .player_id = client.client_id
             };
 
             uint8_t *packet;
-            uint32_t packet_size;
-            message_serialize((MessageStorage*)&m, &packet, &packet_size);
+            size_t packet_size;
+            message_serialize(&m, &packet, &packet_size);
             client_packet_send(&client, packet, packet_size);
         }
 
