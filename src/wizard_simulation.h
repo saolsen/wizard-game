@@ -47,9 +47,27 @@ typedef struct {
 
 } SimulationState;
 
-void simulation_step(SimulationState *prev, SimulationState *next, float dt) {
-    // no op
+// need player input.
+// I guess before this is run player input must be figured out for other clients where we don't know wuddup.
+
+// In c mutation is def the nicest thing to do code wise. If I can just mutate the fuck out of this prev state it's
+// chill. Maybe I just need to literally pass in old and mutate it and handle copying behind the scenes.
+
+// What happens if we do it in the functional style like this
+void simulation_step(const SimulationState *prev, SimulationState *next, const PlayerInput *inputs, float dt) {
+    // @TODO: Maybe have this already happen before calling this.
     *next = *prev;
+    
+    for (int player_index=0; player_index < next->num_players; player_index++) {
+        uint64_t player_id = next->player_ids[player_index];
+        const PlayerInput *input = inputs + player_index;
+        
+        V2 *player_pos = next->player_positions + player_index;
+
+        if (input->pressing_forward) {
+            player_pos->y += 1; // lol
+        }
+    }
 }
 
 #endif // _wizard_simulation_h
@@ -58,12 +76,28 @@ void simulation_step(SimulationState *prev, SimulationState *next, float dt) {
 TEST test_function_runs(void) {
     SimulationState prev = {0};
     SimulationState next = {0};
-    simulation_step(&prev, &next, 1.0f/60.0f);
+    simulation_step(&prev, &next, NULL, 1.0f/60.0f);
     ASSERT(1);
     PASS();
 }
 
+TEST test_1_player_simulation(void) {
+    SimulationState prev = {
+        .num_players = 1,
+        .player_ids = {12345, 0},
+        .player_positions = {10, 10, 0}
+    };
+    PlayerInput player_inputs[] = {
+        (PlayerInput){0}
+    };
+    SimulationState next = {0};
+    simulation_step(&prev, &next, player_inputs, 1.0f/60.0f);
+    ASSERT(next.num_players = prev.num_players);
+    PASS();
+}
+
 SUITE(wizard_simulation_tests) {
-    RUN_TEST(test_something);
+    RUN_TEST(test_function_runs);
+    RUN_TEST(test_1_player_simulation);
 }
 #endif

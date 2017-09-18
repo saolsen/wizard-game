@@ -68,7 +68,7 @@ typedef struct {
 int message_serialize(Message *message, uint8_t **data, size_t *size)
 {   
     mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, data, size);
+    mpack_writer_init_growable(&writer, (void*)data, size);
 
     Message *msg = message;
     switch(message->type) {
