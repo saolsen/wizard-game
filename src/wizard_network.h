@@ -9,9 +9,7 @@
 #ifndef _wizard_network_h
 #define _wizard_network_h
 
-#include <malloc.h>
-#include <inttypes.h>
-#include <stdint.h>
+#include "wizard.h"
 
 #include "netcode.h"
 #include "reliable.h"
@@ -475,7 +473,7 @@ void server_destroy(NetworkServer *server)
 // I should be able to reuse this for later multiplayer games tho, that's pretty dope.
 
 TEST test_network_thingy(void) {
-    ASSERT(true);
+    ASSERT(1);
     PASS();
 }
 

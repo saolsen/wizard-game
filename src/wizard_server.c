@@ -12,16 +12,13 @@
 // array, put_index, get_index, some way to know if it's full...
 
 // sometimes ya need a map too and occasionally all those things have to grow.
-
-#include <stdio.h>
-#include <assert.h>
-#include <string.h>
-#include <signal.h>
-#include <inttypes.h>
-#include <malloc.h>
-
+#include "wizard.h"
 #include "wizard_network.h"
 #include "wizard_message.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <signal.h>
 
 static volatile int quit = 0;
 
