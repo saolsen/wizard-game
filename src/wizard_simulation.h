@@ -17,6 +17,8 @@
 #ifndef _wizard_simulation_h
 #define _wizard_simulation_h
 
+#include "wizard.h"
+
 typedef struct {
     union {
         float x;

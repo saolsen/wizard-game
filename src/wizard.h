@@ -12,4 +12,8 @@
 
 #include <stdio.h> // @TODO: drop this, it's for printf
 
+#define LEN(e) (sizeof(e)/sizeof(e[0]))
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+
 #endif //_wizard_h

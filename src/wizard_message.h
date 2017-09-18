@@ -1,6 +1,8 @@
 #ifndef _wizard_message_h
 #define _wizard_message_h
 
+#include "wizard.h"
+
 // Gonna use mpack because it should make this a lot easier.
 // @Optomize: Something with better compression for our specific use cases.
 #include "mpack.h"
