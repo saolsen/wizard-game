@@ -9,6 +9,7 @@
 
 #include "wizard_network.h"
 #include "wizard_message.h"
+#include "wizard_simulation.h"
 
 TEST test_a_good_thing(void) {
     ASSERT(true);
@@ -32,5 +33,6 @@ int main(int argc, char **argv) {
     RUN_SUITE(wizard_tests);
     RUN_SUITE(wizard_network_tests);
     RUN_SUITE(wizard_message_tests);
+    RUN_SUITE(wizard_simulation_tests);
     GREATEST_MAIN_END();
 }
