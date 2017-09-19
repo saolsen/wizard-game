@@ -3,8 +3,6 @@
 
 #include "wizard.h"
 
-// Gonna use mpack because it should make this a lot easier.
-// @Optomize: Something with better compression for our specific use cases.
 #include "mpack.h"
 
 typedef enum {
@@ -15,40 +13,11 @@ typedef enum {
     MT_PlayerWave,           // Sent by the server to all connected clients when someone waves.
 } MessageType;
 
-/* typedef struct {
-    MessageType type;
-    uint64_t player_id;
-} PlayerConnectedMessage;
-
-typedef struct {
-    MessageType type;
-    uint64_t player_id;
-} PlayerDisconnectedMessage;
-
-typedef struct {
-    MessageType type;
-    uint64_t player_ids[32];
-    int num_players;
-    float player_positions[32*2]; // x and y for all 32 possible players.
-} CurrentPlayerStateMessage;
-
-typedef struct {
-    MessageType type;
-    uint64_t player_id;
-} PlayerWaveMessage; */
-
-// If I figure out how I wanna do memory management I can just have these all
+// @TODO
+// Once I figure out how I wanna do memory management I can just have these all
 // be their own struct and just pass header pointers or something.
-
-// @Q: Is there a better way to do this? I could embed them all manually but that's annoying to remember which fields
-// go in which. I could metaprogram that I guess.
-
-
 // @NOTE: Keep all the messages in the same structure to make it easy to work with them. Usually only a few of these are allocated
 // at a time so it's not a big deal. The over the wire format is compressed (see serialize / deserialize).
-
-// If I decide I can just pass an arena for messages and just allocate them on demand I can go back to 1 struct per mesasge type
-// and a switch on the type. That would actually be really nice to do. Can do dynamic sized shit that way too.
 typedef struct {
     MessageType type;
     union {
@@ -65,8 +34,6 @@ typedef struct {
     };
 } Message;
 
-
-// @OPTIMIZATION: I could just metaprogram these functions from the struct definitions above.
 int message_serialize(Message *message, uint8_t **data, size_t *size)
 {   
     mpack_writer_t writer;
@@ -166,7 +133,7 @@ MessageType message_deserialize(uint8_t *data, size_t size, Message *message)
 
 #ifdef WIZARD_TESTING
 
-// @TODO: Make this a property test.
+// @TODO: Write these as property tests.
 TEST test_serialize_deserialize(void) {
     uint8_t *data = NULL;
     size_t s;

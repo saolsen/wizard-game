@@ -26,3 +26,13 @@ a simulation with logic that runs on both sides
 how do you manage all that?
 how does time work?
 - I think reliable will give you some shit that useful to help out.
+
+I need some docs and shit prolly. Like what are my calls
+@Q
+@TODO
+@OPTIMIZE
+@HARDCODE
+@NOTE
+@BUG
+@BRITTLE
+@COPYPASTE

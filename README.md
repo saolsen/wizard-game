@@ -12,7 +12,7 @@ There are a few components.
 
 WizardClient is written in C (and uses raylib). The client is targeted at the big three desktop platforms; Windows, OSX and linux. (They have not all been tested yet.)
 
-WizardServer is also written in c and is a netcode.io service. It runs on Windows and OSX because it makes development easier but it is really only meant to target Linux in production.
+WizardServer is also written in C and is a netcode.io service. It runs on Windows and OSX because it makes development easier but it is really only meant to target Linux in production.
 
 WizardAPI is written in python and uses postgres to store state.
 
@@ -41,7 +41,7 @@ Run `premake5 solution` to generate project files and open the solution. Then us
 
 #### Linux
 
-Run `premake5 gmake` to generate a makefile, then run the individual targets with make.
+Run `premake5 gmake` to generate a makefile, then cd to the build directory and run the individual targets with make.
 
 There are also premake5 targets to build and test programs directly.
 
@@ -80,6 +80,7 @@ Wizard Game uses a few wonderful open source libraries.
 * [netcode.io](https://github.com/networkprotocol/netcode.io)
 * [realiable.io](https://github.com/networkprotocol/reliable.io)
 * [raylib](https://github.com/raysan5/raylib)
+* [mpack](https://github.com/ludocode/mpack)
 
 @TODO:
-Probably also going to use sqlite and msgpack
+Probably also going to use sqlite

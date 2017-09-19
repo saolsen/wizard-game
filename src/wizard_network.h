@@ -1,6 +1,3 @@
-// Do 1 more pass of this, just check on initialization and teardown state.
-// I think this is just about good enough to write some basic test code againts.
-
 // Still @TODO
 // - Message based interface with reliable / non reliable.
 // - Use reliable.io to track packet acks and handle them.
@@ -16,6 +13,7 @@
 
 #define LEN(e) (sizeof(e)/sizeof(e[0]))
 
+// @NOTE: This code would work for any ring buffer.
 // @TODO: Pull this out in some way that it's useable other places too.
 // @OPTIMIZATION: Can use modulo and if power of 2 can use & (size-1) insetad of % size 
 int enqueue(uint64_t *data, int capacity, int *head, int *tail, uint64_t e) {
@@ -33,8 +31,7 @@ int enqueue(uint64_t *data, int capacity, int *head, int *tail, uint64_t e) {
 
 // returns 0 if queue is empty or 1 if there's an element.
 // makes it easier to use in a while loop.
-// holy shit do I really need to figure out my return code life.
-// @TODO
+// @TODO: Be consistent with how you use return values. Maybe make your own flags instead of just ints.
 int dequeue(uint64_t *data, int capacity, int *head, int *tail, uint64_t *e) {
     if (*head == *tail) { // empty
         return 0;
@@ -48,6 +45,7 @@ int dequeue(uint64_t *data, int capacity, int *head, int *tail, uint64_t *e) {
     return 1;
 }
 
+// @HARDCODE: This will be shared between server and web.
 static uint8_t private_key[NETCODE_KEY_BYTES] = { 0x60, 0x6a, 0xbe, 0x6e, 0xc9, 0x19, 0x10, 0xea, 
                                                   0x9a, 0x65, 0x62, 0xf6, 0x6f, 0x2b, 0x30, 0xe4, 
                                                   0x43, 0x71, 0xd6, 0x2c, 0xd1, 0x99, 0x27, 0x26,
@@ -121,7 +119,7 @@ int client_connect(NetworkClient *client, double time, uint8_t *connect_token) {
 
     uint8_t default_connect_token[NETCODE_CONNECT_TOKEN_BYTES];
     if (!connect_token) {
-        // Generate hardcoded test token for dev.
+        // @HARDCODE
         NETCODE_CONST char *server_address = "127.0.0.1:40000";
 
         uint64_t client_id = 0;

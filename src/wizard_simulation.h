@@ -1,3 +1,6 @@
+// clients send last n inputs so we dont need to make those messages reliable.
+// server just sends the latest state every frame.
+
 // This is the code for the game simulation.
 // Step 1
 // - write some simulation code, run it with local client inputs and render the result.
@@ -109,6 +112,7 @@ void simulation_step(const SimulationState *prev, SimulationState *next, const P
         player_p->x += player_dp->x * dt;
         player_p->y += player_dp->y * dt;
 
+        // shitty clamp to game work
         player_p->x = MAX(player_p->x, 0);
         player_p->y = MAX(player_p->y, 0);
         player_p->x = MIN(player_p->x, WORLD_WIDTH);

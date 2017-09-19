@@ -85,7 +85,6 @@ int main(int argc, char**argv ) {
         ClearBackground(RAYWHITE);
         DrawFPS(GetScreenWidth() - 75, 10);
 
-        // @TODO: Draw the gamestate.
         float scale_x = GetScreenWidth() / WORLD_WIDTH;
         float scale_y = GetScreenWidth() / WORLD_HEIGHT;
         DrawRectangle(state.player_positions[0].x*scale_x - 5, GetScreenHeight() - state.player_positions[0].y*scale_y - 10, 10, 10, BLUE);

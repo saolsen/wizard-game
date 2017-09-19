@@ -1,17 +1,3 @@
-// stuff for wizard.h
-// push
-// pop
-// allocate_freelist
-// 
-
-// You need like 2 fucking things to program.
-// a stack
-// a ring buffer
-// stack is easy, just ++ --
-// ring buffer is a bit more complicated
-// array, put_index, get_index, some way to know if it's full...
-
-// sometimes ya need a map too and occasionally all those things have to grow.
 #include "wizard.h"
 #include "wizard_network.h"
 #include "wizard_message.h"
@@ -68,7 +54,7 @@ int main(int argc, char **argv)
             gamestate->connected_clients[gamestate->num_connected_clients++] = client_id;
 
             // broadcast to other connected clients
-            // @TODO: would miss people if they both joined the same tick, probably gonna have a buffered broadcast channel for stuff like
+            // @BUG: Would miss people if they both joined the same tick, probably gonna have a buffered broadcast channel for stuff like
             // this eventuially.
             Message m = {
                 .type = MT_PlayerConnected,
