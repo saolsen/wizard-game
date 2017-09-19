@@ -1,18 +1,17 @@
 #define WIZARD_TESTING
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
-#include <stdbool.h>
-
 #include "greatest.h"
 
+#include "wizard.h"
 #include "wizard_network.h"
 #include "wizard_message.h"
 #include "wizard_simulation.h"
 
+#include <stdlib.h>
+#include <stdio.h>
+
 TEST test_a_good_thing(void) {
-    ASSERT(true);
+    ASSERT(1);
     PASS();
 }
 

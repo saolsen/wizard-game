@@ -1,6 +1,8 @@
 #ifndef _wizard_message_h
 #define _wizard_message_h
 
+#include "wizard.h"
+
 // Gonna use mpack because it should make this a lot easier.
 // @Optomize: Something with better compression for our specific use cases.
 #include "mpack.h"
@@ -120,7 +122,7 @@ int message_serialize(Message *message, uint8_t **data, size_t *size)
 MessageType message_deserialize(uint8_t *data, size_t size, Message *message)
 {
     mpack_reader_t reader;
-    mpack_reader_init_data(&reader, data, size);
+    mpack_reader_init_data(&reader, (void*)data, size);
 
     mpack_expect_array(&reader);
     MessageType *message_type = (MessageType*)message;

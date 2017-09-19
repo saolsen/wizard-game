@@ -19,8 +19,13 @@
 
 #include "wizard.h"
 
+<<<<<<< HEAD
 typedef union {
     struct {
+=======
+typedef struct {
+    union {
+>>>>>>> 9d1820b2e61e116dc2d0b6f32dd0cb50dfd1b8c7
         float x;
         float y;
     };

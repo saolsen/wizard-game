@@ -1,17 +1,15 @@
-#include <stdio.h>
-#include <assert.h>
-#include <string.h>
-#include <stdbool.h>
-#include <inttypes.h>
-#include <malloc.h>
+#include "wizard.h"
+#include "wizard_network.h"
+#include "wizard_message.h"
+#include "wizard_simulation.h"
 
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
-#include "wizard_network.h"
-#include "wizard_message.h"
-#include "wizard_simulation.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
 
 void _state_change_callback(void* , int, int);
 
