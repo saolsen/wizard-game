@@ -34,35 +34,15 @@ int main(int argc, char**argv ) {
 
     bool am_connected = false;
 
+    SimulationState state = {
+        .num_players = 1,
+        .player_ids = {12345, 0},
+        .player_positions = {(V2){10, 10}, 0},
+        .player_velocities = {(V2){0, 0}, 0}
+    };
+
     while (!WindowShouldClose()) {
         client_update(&client, time);
-
-        // I don't think I really need this, but I do probably need to be sending some sort of message every frame
-        // to keep the connection alive.
-
-        /* if (am_connected) {
-            // keepalive packet, gonna ditch this.
-
-            char *data;
-            size_t size;
-            mpack_writer_t writer;
-            mpack_writer_init_growable(&writer, &data, &size);
-
-            mpack_start_map(&writer, 2);
-            mpack_write_cstr(&writer, "compact");
-            mpack_write_bool(&writer, true);
-            mpack_write_cstr(&writer, "schema");
-            mpack_write_uint(&writer, 0);
-            mpack_finish_map(&writer);
-
-            if (mpack_writer_destroy(&writer) != mpack_ok) {
-                printf("Error encoding data, :(\n");
-            }
-
-            client_packet_send(&client, data, (uint32_t)size);
-            
-            free(data);
-        } */
 
         uint8_t *packet;
         size_t packet_size;
@@ -91,14 +71,26 @@ int main(int argc, char**argv ) {
             client_packet_free(&client);
         }
 
-        //if (netcode_client_state(client) <= NETCODE_CLIENT_STATE_DISCONNECTED) {};
+        PlayerInput frame_input = {
+            .pressing_up = IsKeyDown(KEY_W),
+            .pressing_down = IsKeyDown(KEY_S),
+            .pressing_left = IsKeyDown(KEY_A),
+            .pressing_right = IsKeyDown(KEY_D)
+        };
+
+        SimulationState next_state = state;
+        simulation_step(&state, &next_state, &frame_input, delta_time);
+        state = next_state;
 
         BeginDrawing();
 
         ClearBackground(RAYWHITE);
         DrawFPS(GetScreenWidth() - 75, 10);
 
-        int frack = GuiButton((Rectangle) { 10, 10, GetScreenWidth()-20, GetScreenHeight()-20 }, FormatText("Press to %s", "wave"));
+        // @TODO: Draw the gamestate.
+        DrawRectangle(state.player_positions[0].x - 5, GetScreenHeight() - state.player_positions[0].y - 10, 10, 10, BLUE);
+
+        /* int frack = GuiButton((Rectangle) { 10, 10, GetScreenWidth()-20, GetScreenHeight()-20 }, FormatText("Press to %s", "wave"));
         if (frack) {
             printf("U pressed wave\n");
             
@@ -111,7 +103,7 @@ int main(int argc, char**argv ) {
             size_t packet_size;
             message_serialize(&m, &packet, &packet_size);
             client_packet_send(&client, packet, packet_size);
-        }
+        } */
 
         EndDrawing();
         

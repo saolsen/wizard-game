@@ -53,7 +53,7 @@ project "WizardTests"
            "3rdparty/include/netcode.c", "3rdparty/include/reliable.c", "3rdparty/include/mpack.c" }
    links { "sodium" }
    
-if os.is "windows" then
+if os.ishost "windows" then
    newaction
    {
       trigger = "solution",

@@ -17,8 +17,10 @@
 #ifndef _wizard_simulation_h
 #define _wizard_simulation_h
 
-typedef struct {
-    union {
+#include "wizard.h"
+
+typedef union {
+    struct {
         float x;
         float y;
     };
@@ -28,14 +30,10 @@ typedef struct {
 // Need my and other players inputs for this frame.
 // Need to know the time stuff happens at.
 typedef struct {
-    int pressing_forward;
-    int pressing_backwards;
+    int pressing_up;
+    int pressing_down;
     int pressing_left;
     int pressing_right;
-    // Need like a way to keep track of aiming / facing
-    // that could be a joystick value, or mouse motion I guess.
-    // if it's not true top down, player on the bottom has an advantage if the camera is fixed.
-
 } PlayerInput;
 
 typedef struct {
@@ -44,7 +42,7 @@ typedef struct {
     uint8_t num_players;
     uint64_t player_ids[32];
     V2 player_positions[32];
-
+    V2 player_velocities[32];
 } SimulationState;
 
 // need player input.
@@ -54,6 +52,16 @@ typedef struct {
 // chill. Maybe I just need to literally pass in old and mutate it and handle copying behind the scenes.
 
 // What happens if we do it in the functional style like this
+// What are all the outputs of this, are there additional messages that are generated to get sent to players
+// and clients.
+// How do we handle who is authoritative over stuff and if this is client or server code?
+
+// This is all in pixels right now. TODO some other unit.
+#define MAX_SPEED 50
+#define FRICTION 5
+#define WORLD_WIDTH 100
+#define WORLD_HEIGHT 100
+
 void simulation_step(const SimulationState *prev, SimulationState *next, const PlayerInput *inputs, float dt) {
     // @TODO: Maybe have this already happen before calling this.
     *next = *prev;
@@ -62,11 +70,49 @@ void simulation_step(const SimulationState *prev, SimulationState *next, const P
         uint64_t player_id = next->player_ids[player_index];
         const PlayerInput *input = inputs + player_index;
         
-        V2 *player_pos = next->player_positions + player_index;
+        V2 *player_dp = next->player_velocities + player_index;
 
-        if (input->pressing_forward) {
-            player_pos->y += 1; // lol
+        V2 frame_acceleration = {.x=0, .y=0};
+
+        if (input->pressing_up) {
+            frame_acceleration.y += 1;
         }
+        if (input->pressing_down) {
+            frame_acceleration.y -= 1;
+        }
+        if (input->pressing_left) {
+            frame_acceleration.x -= 1;
+        }
+        if (input->pressing_right) {
+            frame_acceleration.x += 1;
+        }
+
+        // @TODO: Normalize direction for keyboard input. Otherwise diagonal is faster.
+
+        frame_acceleration.x *= MAX_SPEED;
+        frame_acceleration.y *= MAX_SPEED;
+
+        // @TODO: if frame accel is different direction than velocity, make it even faster to seem responsive.
+
+        // friction
+        frame_acceleration.x += -FRICTION * player_dp->x;
+        frame_acceleration.y += -FRICTION * player_dp->y;
+
+        // apply frame acceleration
+        player_dp->x += (frame_acceleration.x * dt);
+        player_dp->y += (frame_acceleration.y * dt);
+
+        // apply frame movement
+        // @TODO: can pull this out and do it for all entities at once.
+        // When you do collision detection this becomes a loop and we use gjk on it. TODO
+        V2 *player_p = next->player_positions + player_index;
+        player_p->x += player_dp->x * dt;
+        player_p->y += player_dp->y * dt;
+
+        player_p->x = MAX(player_p->x, 0);
+        player_p->y = MAX(player_p->y, 0);
+        player_p->x = MIN(player_p->x, WORLD_WIDTH);
+        player_p->y = MIN(player_p->y, WORLD_HEIGHT);
     }
 }
 
