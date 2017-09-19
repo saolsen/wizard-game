@@ -19,13 +19,8 @@
 
 #include "wizard.h"
 
-<<<<<<< HEAD
 typedef union {
     struct {
-=======
-typedef struct {
-    union {
->>>>>>> 9d1820b2e61e116dc2d0b6f32dd0cb50dfd1b8c7
         float x;
         float y;
     };
@@ -62,8 +57,8 @@ typedef struct {
 // How do we handle who is authoritative over stuff and if this is client or server code?
 
 // This is all in pixels right now. TODO some other unit.
-#define MAX_SPEED 50
-#define FRICTION 5
+#define MAX_SPEED 250
+#define FRICTION 10
 #define WORLD_WIDTH 100
 #define WORLD_HEIGHT 100
 
