@@ -26,9 +26,17 @@ WORKDIR /root/wizard-game
 RUN rm -rf /root/wizard-game/build
 RUN find . -exec touch {} +
 
-RUN premake5 gmake && cd build && make -j32 WizardServer WizardTests config=release
+RUN premake5 gmake && cd build && make -j32 config=release WizardServer WizardTests
 
-FROM alpine:latest
-COPY --from=builder /root/wizard-game/build/bin/Release/WizardServer /usr/local/bin
-COPY --from=builder /root/wizard-game/build/bin/Release/WizardTests /usr/local/bin
+#FROM alpine:latest
+#RUN mkdir -p /opt/wizard/bin
+#COPY --from=builder /root/wizard-game/build/bin/Release/WizardServer /opt/wizard/bin
+#COPY --from=builder /root/wizard-game/build/bin/Release/WizardTests /opt/wizard/bin
+#EXPOSE 40000
+
+# Proof the static musl build works everywhere
+FROM bitnami/minideb:latest
+RUN mkdir -p /opt/wizard/bin
+COPY --from=builder /root/wizard-game/build/bin/Release/WizardServer /opt/wizard/bin
+COPY --from=builder /root/wizard-game/build/bin/Release/WizardTests /opt/wizard/bin
 EXPOSE 40000

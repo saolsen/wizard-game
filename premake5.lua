@@ -30,6 +30,8 @@ workspace "WizardGame"
 
    filter "system:macosx"
       system "macosx"
+      libdirs { "3rdparty/lib/osx" }
+      linkoptions { "-framework Cocoa -framework OpenGL -framework IOKit -framework CoreVideo" }
 
    filter "system:linux"
       system "linux"

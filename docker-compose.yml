@@ -35,11 +35,11 @@ services:
     ports:
       - 40000:40000/udp
     # privileged: true # This is needed for gdb.
-    command: "WizardServer" # stdbuf -o0 if needed
+    command: "/opt/wizard/bin/WizardServer" # stdbuf -o0 if needed
 
   wizard_tests:
     build:
       context: .
       dockerfile: Dockerfile.build
     # privileged: true # This is needed for gdb.
-    command: "WizardTests"
+    command: "/opt/wizard/bin/WizardTests"
