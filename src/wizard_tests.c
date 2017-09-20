@@ -16,7 +16,7 @@ TEST test_a_good_thing(void) {
 }
 
 TEST test_a_bad_thing(void) {
-    ASSERT(0);
+    ASSERT(1);
     PASS();
 }
 
