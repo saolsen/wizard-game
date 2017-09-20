@@ -1,3 +1,3 @@
 #!/bin/bash
 
-apt-get update && apt-get install -y musl-gcc
+apt-get update && apt-get install -y musl-tools
