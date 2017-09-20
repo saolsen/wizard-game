@@ -38,13 +38,7 @@ workspace "WizardGame"
       system "linux"
       libdirs { "3rdparty/lib/linux" }
       buildoptions { "-std=gnu99"}
-      linkoptions { "--static -lm" }
-
-project "WizardClient"
-   kind "ConsoleApp"
-   files { "src/wizard_client.c",
-           "3rdparty/include/netcode.c", "3rdparty/include/reliable.c", "3rdparty/include/mpack.c" }
-   links { "sodium", "glfw3", "raylib"}
+      linkoptions { "--static" }
 
 project "WizardServer"
    kind "ConsoleApp"
@@ -58,6 +52,14 @@ project "WizardTests"
            "3rdparty/include/netcode.c", "3rdparty/include/reliable.c", "3rdparty/include/mpack.c" }
    links { "sodium" }
    
+if os.ishost "windows" or os.ishost "macosx" then
+   project "WizardClient"
+      kind "ConsoleApp"
+      files { "src/wizard_client.c",
+              "3rdparty/include/netcode.c", "3rdparty/include/reliable.c", "3rdparty/include/mpack.c" }
+      links { "sodium", "raylib", "glfw3" }
+end
+
 if os.ishost "windows" then
    newaction
    {
