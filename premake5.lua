@@ -27,7 +27,7 @@ workspace "WizardGame"
    filter "system:windows"
       system "windows"
       libdirs { "3rdparty/lib/windows" }
-      systemversion "10.0.10240.0"
+      systemversion "10.0.15063.0"
 
    filter "system:macosx"
       system "macosx"
