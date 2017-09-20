@@ -36,7 +36,9 @@ workspace "WizardGame"
 
    filter "system:linux"
       system "linux"
-      linkoptions { "--static" }
+      libdirs { "3rdparty/lib/linux" }
+      buildoptions { "-std=gnu99"}
+      linkoptions { "--static -lm" }
 
 project "WizardClient"
    kind "ConsoleApp"

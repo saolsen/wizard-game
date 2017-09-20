@@ -1,32 +1,33 @@
-FROM alpine:latest as builder
+#FROM alpine:latest as builder
 
-RUN apk add --no-cache --update gcc musl-dev openssl make
+#RUN apk add --no-cache --update gcc musl-dev openssl make tree
 
-RUN wget https://github.com/jedisct1/libsodium/releases/download/1.0.10/libsodium-1.0.10.tar.gz && \
-    tar -zxvf libsodium-1.0.10.tar.gz && \
-    cd libsodium-1.0.10 && \
-    ./configure && \
-    make && make check && \
-    make install && \
-    cd .. && \
-    rm -rf libsodium* && \
-    ldconfig /
+#RUN wget https://github.com/jedisct1/libsodium/releases/download/1.0.10/libsodium-1.0.10.tar.gz && \
+#    tar -zxvf libsodium-1.0.10.tar.gz && \
+#    cd libsodium-1.0.10 && \
+#    ./configure && \
+#    make && make check && \
+#    make install && \
+#    cd .. && \
+#    rm -rf libsodium* && \
+#    ldconfig /
 
-RUN wget https://github.com/premake/premake-core/releases/download/v5.0.0-alpha12/premake-5.0.0-alpha12-src.zip && \
-    unzip premake-5.0.0-alpha12-src.zip && \
-    cd premake-5.0.0-alpha12/build/gmake.unix && \
-    make && \
-    cd ../../.. && \
-    mv premake-5.0.0-alpha12/bin/release/premake5 /usr/local/bin && \
-    rm -rf premake-5*
+#RUN wget https://github.com/premake/premake-core/releases/download/v5.0.0-alpha12/premake-5.0.0-alpha12-src.zip && \
+#    unzip premake-5.0.0-alpha12-src.zip && \
+#    cd premake-5.0.0-alpha12/build/gmake.unix && \
+#    make && \
+#    cd ../../.. && \
+#    mv premake-5.0.0-alpha12/bin/release/premake5 /usr/local/bin && \
+#    rm -rf premake-5*
 
-ADD . /root/wizard-game
-WORKDIR /root/wizard-game
+#ADD . /root/wizard-game
+#WORKDIR /root/wizard-game
 
-RUN rm -rf /root/wizard-game/build
-RUN find . -exec touch {} +
+#RUN rm -rf /root/wizard-game/build
+#RUN find . -exec touch {} +
 
-RUN premake5 gmake && cd build && make -j32 config=release WizardServer WizardTests
+#RUN pwd
+#RUN tools/linux/premake5 gmake && cd build && make -j32 config=release WizardServer WizardTests
 
 #FROM alpine:latest
 #RUN mkdir -p /opt/wizard/bin
@@ -35,6 +36,18 @@ RUN premake5 gmake && cd build && make -j32 config=release WizardServer WizardTe
 #EXPOSE 40000
 
 # Proof the static musl build works everywhere
+
+
+FROM bitnami/minideb:latest as builder
+RUN install_packages musl-tools make
+ADD . /root/wizard-game
+WORKDIR /root/wizard-game
+
+RUN rm -rf /root/wizard-game/build
+RUN find . -exec touch {} +
+
+RUN tools/linux/premake5 gmake && cd build && make -j32 config=release CC=musl-gcc WizardServer WizardTests
+
 FROM bitnami/minideb:latest
 RUN mkdir -p /opt/wizard/bin
 COPY --from=builder /root/wizard-game/build/bin/Release/WizardServer /opt/wizard/bin
