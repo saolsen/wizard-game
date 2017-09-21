@@ -30,6 +30,79 @@ typedef union {
     float e[2];
 } V2;
 
+// Not data oriented at this point. Gonna probably start with a huge array like this and work it back? Maybe?
+// @TODO: Figure out later, just doing this for now cuz it's easier?
+typedef enum {
+    ET_NONE,
+    ET_Player,
+    ET_WALL
+} EntityType;
+
+typedef enum {
+    GT_NONE,
+    GT_AABB,
+    GT_CIRCLE,
+} GeometryType;
+
+// @NOTE: Geometry is all relative to the player position. Keep that one in mind?
+// @Q: Should it be?
+
+typedef struct {
+    V2 p;
+    V2 min;
+    V2 max;
+} AABB;
+
+typedef struct {
+    V2 pos;
+    float r;
+} Circle;
+
+typedef struct {
+    GeometryType type;
+    union {
+        AABB aabb;
+        Circle circle;
+    };
+} Geometry;
+
+typedef enum {
+    EF_Collides = 0x1
+    // EF_Active = 0x2
+    // EF_FOO = 0x4
+} EntityFlags;
+
+// @NOTE: Reusable for any flags stuff.
+// Dunno if I want this or just like use the shit.
+bool flags_is_set(uint32_t flags, uint32_t flag)
+{
+    return flags & flag;
+}
+
+void flags_set(uint32_t *flags, uint32_t flag)
+{
+    *flags |= flag;
+}
+
+void flags_clear(uint32_t *flags, uint32_t flag)
+{
+    *flags &= ~flag;
+}
+
+typedef struct _entity {
+    uint32_t entity_id;
+    uint32_t flags;
+
+    EntityType type;
+    V2 p;   // position
+    V2 dp;  // velocity
+    V2 ddp; // acceleration
+    Geometry collision_pieces[32]; // collision geometry positions are relative to entity position.
+    uint8_t num_collision_pieces;
+
+    struct _entity *next;
+} Entity;
+
 // Need my and other players inputs for this frame.
 // Need to know the time stuff happens at.
 typedef struct {
@@ -44,9 +117,43 @@ typedef struct {
     // @TODO: How do we deal with time in this?
     uint8_t num_players;
     uint64_t player_ids[32];
-    V2 player_positions[32];
-    V2 player_velocities[32];
+    uint32_t player_entities[32]; // The entity ids for the players.
+    
+    Entity entities[128];
+    uint8_t num_entities;
+    Entity *first_free_entity;
 } SimulationState;
+
+SimulationState create_new_one_player_game() {
+    Entity basic_player_entity = {
+        .entity_id = 99,
+        .flags = EF_Collides,
+        .type = ET_Player,
+        .p = {.x=0, .y=0},
+        .dp = {.x=0, .y=0},
+        .ddp = {.x=0, .y=0},
+        .collision_pieces = {
+            {.type = GT_AABB,
+            .aabb = {
+                .p = {.x=0,.y=0},
+                .min = {.x=-5, .y=0},
+                .max = {.x=5, .y=10}}},
+            0
+        },
+        .num_collision_pieces = 1,
+    };
+
+    SimulationState new_one_player_game = {
+        .num_players = 1,
+        .player_ids = {1, 0},
+        .player_entities = {99, 0},
+        .entities = {basic_player_entity,  0},
+        .first_free_entity = NULL,
+        .num_entities = 1
+    };
+
+    return new_one_player_game;
+}
 
 // need player input.
 // I guess before this is run player input must be figured out for other clients where we don't know wuddup.
@@ -59,64 +166,79 @@ typedef struct {
 // and clients.
 // How do we handle who is authoritative over stuff and if this is client or server code?
 
-// This is all in pixels right now. TODO some other unit.
 #define MAX_SPEED 250
 #define FRICTION 10
 #define WORLD_WIDTH 100
 #define WORLD_HEIGHT 100
 
 void simulation_step(const SimulationState *prev, SimulationState *next, const PlayerInput *inputs, float dt) {
-    // @TODO: Maybe have this already happen before calling this.
+    // Assumes that next is the same as prev so we only have to write changes.
+    // just set it in case for now since there's no way to check struct equality easily.
     *next = *prev;
-    
+    // @TODO: Should use a fixed timestep!
+    // Apply player input to entities.
     for (int player_index=0; player_index < next->num_players; player_index++) {
         uint64_t player_id = next->player_ids[player_index];
-        const PlayerInput *input = inputs + player_index;
+        uint32_t entity_id = next->player_entities[player_index];
         
-        V2 *player_dp = next->player_velocities + player_index;
+        const PlayerInput *input = inputs + player_index;
 
-        V2 frame_acceleration = {.x=0, .y=0};
-
-        if (input->pressing_up) {
-            frame_acceleration.y += 1;
+        // Get entity by id
+        // @TODO: Probably going to have a hashmap of entity id at some point since this lookup happens a lot.
+        Entity *player_entity = NULL;
+        for (int i=0; i<next->num_entities; i++) {
+            Entity *entity = next->entities + i;
+            if (entity->type != ET_NONE) {
+                if (entity->entity_id == entity_id) {
+                    player_entity = entity;
+                    break;
+                }
+            }
         }
-        if (input->pressing_down) {
-            frame_acceleration.y -= 1;
+        if (player_entity) {
+            V2 frame_acceleration = {.x = 0, .y = 0};
+            if (input->pressing_up) { frame_acceleration.y += 1; }
+            if (input->pressing_down) { frame_acceleration.y -= 1; }
+            if (input->pressing_left) { frame_acceleration.x -= 1; }
+            if (input->pressing_right) { frame_acceleration.x += 1; }
+            frame_acceleration.x *= MAX_SPEED;
+            frame_acceleration.y *= MAX_SPEED;
+            player_entity->ddp = frame_acceleration;
         }
-        if (input->pressing_left) {
-            frame_acceleration.x -= 1;
+    }
+
+    // @TODO: Prolly run AI here.
+
+    // Simulate Entities
+    // @OPTIMIZE: This is a place where data oriented design could help cache.
+    // Only need geometry and p/dp/ddp for these calculations I think.
+
+    // Simulate entities one at a time?
+    for (int i=0; i<next->num_entities; i++) {
+        Entity *entity = next->entities + i;
+        if (entity->ddp.x > 0) {
+            printf("FUCK");
         }
-        if (input->pressing_right) {
-            frame_acceleration.x += 1;
-        }
 
-        // @TODO: Normalize direction for keyboard input. Otherwise diagonal is faster.
+        //entity->ddp.x += -FRICTION * entity->dp.x;
+        //entity->ddp.y += -FRICTION * entity->dp.y;
 
-        frame_acceleration.x *= MAX_SPEED;
-        frame_acceleration.y *= MAX_SPEED;
+        // @TODO: You know like everything, collision detection and response.
 
-        // @TODO: if frame accel is different direction than velocity, make it even faster to seem responsive.
+        entity->dp.x += entity->ddp.x * dt;
+        entity->dp.y += entity->ddp.y * dt;
 
-        // friction
-        frame_acceleration.x += -FRICTION * player_dp->x;
-        frame_acceleration.y += -FRICTION * player_dp->y;
+        entity->p.x += entity->dp.x * dt;
+        entity->p.y += entity->dp.y * dt;
 
-        // apply frame acceleration
-        player_dp->x += (frame_acceleration.x * dt);
-        player_dp->y += (frame_acceleration.y * dt);
+        // shitty clamp
+        entity->p.x = MAX(entity->p.x, 0);
+        entity->p.y = MAX(entity->p.y, 0);
+        entity->p.x = MIN(entity->p.x, WORLD_WIDTH);
+        entity->p.y = MIN(entity->p.y, WORLD_HEIGHT);
 
-        // apply frame movement
-        // @TODO: can pull this out and do it for all entities at once.
-        // When you do collision detection this becomes a loop and we use gjk on it. TODO
-        V2 *player_p = next->player_positions + player_index;
-        player_p->x += player_dp->x * dt;
-        player_p->y += player_dp->y * dt;
-
-        // shitty clamp to game work
-        player_p->x = MAX(player_p->x, 0);
-        player_p->y = MAX(player_p->y, 0);
-        player_p->x = MIN(player_p->x, WORLD_WIDTH);
-        player_p->y = MIN(player_p->y, WORLD_HEIGHT);
+        entity->ddp.x = 0;
+        entity->ddp.y = 0;
     }
 }
 
@@ -132,11 +254,7 @@ TEST test_function_runs(void) {
 }
 
 TEST test_1_player_simulation(void) {
-    SimulationState prev = {
-        .num_players = 1,
-        .player_ids = {12345, 0},
-        .player_positions = {10, 10, 0}
-    };
+    SimulationState prev = create_new_one_player_game();
     PlayerInput player_inputs[] = {
         (PlayerInput){0}
     };

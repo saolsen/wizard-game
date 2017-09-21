@@ -32,12 +32,7 @@ int main(int argc, char**argv ) {
 
     bool am_connected = false;
 
-    SimulationState state = {
-        .num_players = 1,
-        .player_ids = {12345, 0},
-        .player_positions = {(V2){10, 10}, 0},
-        .player_velocities = {(V2){0, 0}, 0}
-    };
+    SimulationState state = create_new_one_player_game();
 
     while (!WindowShouldClose()) {
         client_update(&client, time);
@@ -77,7 +72,7 @@ int main(int argc, char**argv ) {
         };
 
         SimulationState next_state = state;
-        simulation_step(&state, &next_state, &frame_input, delta_time);
+        simulation_step(&state, &next_state, &frame_input, (float)delta_time);
         state = next_state;
 
         BeginDrawing();
@@ -87,7 +82,7 @@ int main(int argc, char**argv ) {
 
         float scale_x = GetScreenWidth() / WORLD_WIDTH;
         float scale_y = GetScreenWidth() / WORLD_HEIGHT;
-        DrawRectangle(state.player_positions[0].x*scale_x - 5, GetScreenHeight() - state.player_positions[0].y*scale_y - 10, 10, 10, BLUE);
+        DrawRectangle(state.entities[0].dp.x*scale_x - 5, GetScreenHeight() - state.entities[0].dp.y*scale_y - 10, 10, 10, BLUE);
 
         /* int frack = GuiButton((Rectangle) { 10, 10, GetScreenWidth()-20, GetScreenHeight()-20 }, FormatText("Press to %s", "wave"));
         if (frack) {
