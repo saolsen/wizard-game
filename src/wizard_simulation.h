@@ -30,6 +30,30 @@ typedef union {
     float e[2];
 } V2;
 
+V2 v2_add(V2 a, V2 b)
+{
+    return (V2){
+        .x = a.x + b.x,
+        .y = a.y + b.y
+    };
+}
+
+V2 v2_sub(V2 a, V2 b)
+{
+    return (V2){
+        .x = a.x - b.x,
+        .y = a.y - b.y
+    };
+}
+
+V2 v2_scale(V2 v, float f)
+{
+    return (V2){
+        .x = v.x * f,
+        .y = v.y * f
+    };
+}
+
 // Not data oriented at this point. Gonna probably start with a huge array like this and work it back? Maybe?
 // @TODO: Figure out later, just doing this for now cuz it's easier?
 typedef enum {
@@ -141,6 +165,7 @@ SimulationState create_new_one_player_game() {
             0
         },
         .num_collision_pieces = 1,
+        .next = NULL
     };
 
     SimulationState new_one_player_game = {
