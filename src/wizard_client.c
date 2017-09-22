@@ -92,7 +92,6 @@ int main(int argc, char**argv ) {
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
-        DrawFPS(GetScreenWidth() - 80, 10);
 
         // Without any camera, lets draw the bounds of the world where we want them.
         V2 world_min = {.x = 0, .y = 0};
@@ -108,6 +107,20 @@ int main(int argc, char**argv ) {
 
         #define WORLD(v) (Vector2){v.x * scale.x, GetScreenHeight() - v.y * scale.y}
 
+        for (int y = 0; y < WORLD_HEIGHT; y++) {
+            // horisontal line at y
+            V2 from = (V2){world_min.x, y};
+            V2 to = (V2){world_max.x, y};
+            DrawLineEx(WORLD(from), WORLD(to), 1.0, BLUE);
+        }
+
+        for (int x = 0; x < WORLD_WIDTH; x++) {
+            // horisontal line at y
+            V2 from = (V2){x, world_min.y};
+            V2 to = (V2){x, world_max.y};
+            DrawLineEx(WORLD(from), WORLD(to), 1.0, BLUE);
+        }
+
         V2 a = world_min;
         V2 b = (V2){world_min.x, world_max.y};
         V2 c = world_max;
@@ -118,9 +131,17 @@ int main(int argc, char**argv ) {
         DrawLineEx(WORLD(c), WORLD(d), 5.0, GREEN);
         DrawLineEx(WORLD(d), WORLD(a), 5.0, GREEN);
         
-        V2 player_min = (V2){state.entities[0].p.x - 0.3 * scale.x, state.entities[0].p.y};
+        DrawFPS(GetScreenWidth() - 80, 10);
+        DrawText(FormatText("(%.1f,%.1f)", state.entities[0].p.x, state.entities[0].p.y), GetScreenWidth()-100, 30, 24, RED);
+
+        V2 player_p = (V2){state.entities[0].p.x, state.entities[0].p.y};
+        Vector2 world_player_p = WORLD(player_p);
+        world_player_p.x -= 0.3*scale.x;
+        world_player_p.y -= scale.y;
+
+        V2 player_size = (V2){0.3*2, 1};
         //DrawRectangle(WORLD(player_min).x, WORLD(player_min).y, WORLD(player_max).x, WORLD(player_max).y, BLUE);
-        DrawRectangleV(WORLD(player_min), (Vector2){.x = 0.3 * 2 * scale.x, .y=1*scale.y}, BLUE);
+        DrawRectangleV(world_player_p, (Vector2){0.3*2*scale.x, 1*scale.y}, BLUE);
 
         //DrawRectangle(state.entities[0].dp.x * draw_scale - 0.3*draw_scale, GetScreenHeight()/2 - state.entities[0].dp.y * draw_scale - 1*draw_scale, 0.3*2 * draw_scale, 1 * draw_scale, BLUE);
         //DrawCircle(0,0,10,RED);

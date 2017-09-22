@@ -198,8 +198,8 @@ SimulationState create_new_one_player_game() {
 
 #define SPEED 10
 #define FRICTION 1
-#define WORLD_WIDTH 100
-#define WORLD_HEIGHT 100
+#define WORLD_WIDTH 10
+#define WORLD_HEIGHT 10
 
 void simulation_step(const SimulationState *prev, SimulationState *next, const PlayerInput *inputs, float dt) {
     // Assumes that next is the same as prev so we only have to write changes.
