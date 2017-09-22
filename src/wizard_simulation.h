@@ -17,6 +17,11 @@
 // cuz like, i'm going to keep multiple versions of this in memory that are all going to be almost exactly the same.
 // @TODO: think about that...
 
+
+
+// need to think about units in the simulation.
+// I think I want them to be "meters" which means that the dude is gonna be like 1 unit tall. Should make shit make more sense.
+
 #ifndef _wizard_simulation_h
 #define _wizard_simulation_h
 
@@ -160,8 +165,8 @@ SimulationState create_new_one_player_game() {
             {.type = GT_AABB,
             .aabb = {
                 .p = {.x=0,.y=0},
-                .min = {.x=-5, .y=0},
-                .max = {.x=5, .y=10}}},
+                .min = {.x=-0.3, .y=0},
+                .max = {.x=0.4, .y=1}}},
             0
         },
         .num_collision_pieces = 1,
@@ -191,8 +196,8 @@ SimulationState create_new_one_player_game() {
 // and clients.
 // How do we handle who is authoritative over stuff and if this is client or server code?
 
-#define MAX_SPEED 250
-#define FRICTION 10
+#define SPEED 10
+#define FRICTION 1
 #define WORLD_WIDTH 100
 #define WORLD_HEIGHT 100
 
@@ -226,8 +231,8 @@ void simulation_step(const SimulationState *prev, SimulationState *next, const P
             if (input->pressing_down) { frame_acceleration.y -= 1; }
             if (input->pressing_left) { frame_acceleration.x -= 1; }
             if (input->pressing_right) { frame_acceleration.x += 1; }
-            frame_acceleration.x *= MAX_SPEED;
-            frame_acceleration.y *= MAX_SPEED;
+            frame_acceleration.x *= SPEED;
+            frame_acceleration.y *= SPEED;
             player_entity->ddp = frame_acceleration;
         }
     }
@@ -241,27 +246,34 @@ void simulation_step(const SimulationState *prev, SimulationState *next, const P
     // Simulate entities one at a time?
     for (int i=0; i<next->num_entities; i++) {
         Entity *entity = next->entities + i;
-        if (entity->ddp.x > 0) {
-            printf("FUCK");
-        }
 
-        //entity->ddp.x += -FRICTION * entity->dp.x;
-        //entity->ddp.y += -FRICTION * entity->dp.y;
+        // @TODO: ODE for real friction.
+        // @TODO: Does this seem really wrong?
+        //printf("ddp before friction: %f", entity->ddp.x);
+        entity->ddp.x += -FRICTION * entity->dp.x;
+        entity->ddp.y += -FRICTION * entity->dp.y;
+        //printf(", ddp after friction: %f\n", entity->ddp.x);
 
         // @TODO: You know like everything, collision detection and response.
 
-        entity->dp.x += entity->ddp.x * dt;
-        entity->dp.y += entity->ddp.y * dt;
+        V2 next_dp = {0};
+        next_dp.x = (entity->ddp.x * dt) + entity->dp.x;
+        next_dp.y = (entity->ddp.y * dt) + entity->dp.y;
 
-        entity->p.x += entity->dp.x * dt;
-        entity->p.y += entity->dp.y * dt;
+        V2 next_p = {0};
+        next_p.x = (0.5 * entity->ddp.x * dt*dt) + (entity->dp.x * dt) + entity->p.x;
+        next_p.y = (0.5 * entity->ddp.y * dt*dt) + (entity->dp.y * dt) + entity->p.y;
 
-        // shitty clamp
+        entity->dp = next_dp;
+        entity->p = next_p;
+
+        // shitty clamp to world
         entity->p.x = MAX(entity->p.x, 0);
         entity->p.y = MAX(entity->p.y, 0);
         entity->p.x = MIN(entity->p.x, WORLD_WIDTH);
         entity->p.y = MIN(entity->p.y, WORLD_HEIGHT);
 
+        // clear frame acceleration
         entity->ddp.x = 0;
         entity->ddp.y = 0;
     }
