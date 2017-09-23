@@ -13,14 +13,12 @@
 // Step 3
 // - client side predict what other clients input would be and use that in speculative simulation.
 
-// So like, this is the kind of thing where persistent data structures are so dope.
-// cuz like, i'm going to keep multiple versions of this in memory that are all going to be almost exactly the same.
-// @TODO: think about that...
-
-
-
-// need to think about units in the simulation.
-// I think I want them to be "meters" which means that the dude is gonna be like 1 unit tall. Should make shit make more sense.
+// we'll start with zelda because that's a lot easier honestly!
+// so, input will also include an attack button!
+// we'll have a "pressed attach" or "attacked" flag or something.
+// we'll keep track of character facing (left right up down)
+// Dunno if you favor left right or up down when traveling and how that affects combat.
+// I also want a WIZARD BLINK for dodging.
 
 #ifndef _wizard_simulation_h
 #define _wizard_simulation_h
@@ -118,11 +116,19 @@ void flags_clear(uint32_t *flags, uint32_t flag)
     *flags &= ~flag;
 }
 
+typedef enum {
+    FACING_UP,
+    FACING_DOWN,
+    FACING_LEFT,
+    FACING_RIGHT,
+} Facing;
+
 typedef struct _entity {
     uint32_t entity_id;
     uint32_t flags;
 
     EntityType type;
+    Facing facing;
     V2 p;   // position
     V2 dp;  // velocity
     V2 ddp; // acceleration
@@ -134,11 +140,15 @@ typedef struct _entity {
 
 // Need my and other players inputs for this frame.
 // Need to know the time stuff happens at.
+
+// These are a bunch of bools, I can pack them in an int. TODO!!!
 typedef struct {
     int pressing_up;
     int pressing_down;
     int pressing_left;
     int pressing_right;
+    int pressed_attack;
+    int pressed_blink;
 } PlayerInput;
 
 typedef struct {
@@ -196,10 +206,11 @@ SimulationState create_new_one_player_game() {
 // and clients.
 // How do we handle who is authoritative over stuff and if this is client or server code?
 
-#define SPEED 10
-#define FRICTION 1
-#define WORLD_WIDTH 10
-#define WORLD_HEIGHT 10
+// @HARDCODE
+#define SPEED 40
+#define FRICTION 10
+#define WORLD_WIDTH 15
+#define WORLD_HEIGHT 15
 
 void simulation_step(const SimulationState *prev, SimulationState *next, const PlayerInput *inputs, float dt) {
     // Assumes that next is the same as prev so we only have to write changes.
