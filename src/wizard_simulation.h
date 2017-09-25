@@ -61,8 +61,9 @@ V2 v2_scale(V2 v, float f)
 // @TODO: Figure out later, just doing this for now cuz it's easier?
 typedef enum {
     ET_NONE,
-    ET_Player,
-    ET_WALL
+    ET_PLAYER,
+    ET_WALL,
+    ET_FIREBALL
 } EntityType;
 
 typedef enum {
@@ -81,7 +82,7 @@ typedef struct {
 } AABB;
 
 typedef struct {
-    V2 pos;
+    V2 p;
     float r;
 } Circle;
 
@@ -94,7 +95,8 @@ typedef struct {
 } Geometry;
 
 typedef enum {
-    EF_Collides = 0x1
+    EF_COLLIDES = 0x1,
+    EF_FRICTION = 0x2
     // EF_Active = 0x2
     // EF_FOO = 0x4
 } EntityFlags;
@@ -141,14 +143,18 @@ typedef struct _entity {
 // Need my and other players inputs for this frame.
 // Need to know the time stuff happens at.
 
-// These are a bunch of bools, I can pack them in an int. TODO!!!
+// @TODO: These are a bunch of bools, I can pack them in an int.
+// @TODO: Not sure how to do facing yet, it's a thing that changes when different directions are pressed. Gonna make it part of input for now.
 typedef struct {
     int pressing_up;
     int pressing_down;
     int pressing_left;
     int pressing_right;
+
     int pressed_attack;
     int pressed_blink;
+
+    Facing facing; // last direction pressed
 } PlayerInput;
 
 typedef struct {
@@ -166,8 +172,9 @@ typedef struct {
 SimulationState create_new_one_player_game() {
     Entity basic_player_entity = {
         .entity_id = 99,
-        .flags = EF_Collides,
-        .type = ET_Player,
+        .flags = EF_COLLIDES | EF_FRICTION,
+        .type = ET_PLAYER,
+        .facing = FACING_RIGHT,
         .p = {.x=0, .y=0},
         .dp = {.x=0, .y=0},
         .ddp = {.x=0, .y=0},
@@ -242,6 +249,45 @@ void simulation_step(const SimulationState *prev, SimulationState *next, const P
             if (input->pressing_down) { frame_acceleration.y -= 1; }
             if (input->pressing_left) { frame_acceleration.x -= 1; }
             if (input->pressing_right) { frame_acceleration.x += 1; }
+
+            // @TODO
+            player_entity->facing = input->facing;
+            // @TODO
+            if (input->pressed_attack) {
+                // @Q: Is this something that should happen before or after moving entities?
+                // Prolly wanna like batch up entity spawns and do them after the simulation step as they're gonna depend on
+                // iteractions and stuff too.
+
+                Entity *fireball = NULL;
+                if (next->first_free_entity) {
+                    fireball = next->first_free_entity;
+                    next->first_free_entity = fireball->next;
+                } else if (next->num_entities < LEN(next->entities)) {
+                    fireball = next->entities + next->num_entities++;
+                } else {
+                    assert(0); // Error: Can't allocate new entity. TODO
+                }
+
+                if (fireball) {
+                    fireball->entity_id = 2; // @TODO
+                    fireball->flags = EF_COLLIDES;
+                    fireball->type = ET_FIREBALL;
+                    fireball->facing = player_entity->facing;
+                    fireball->p = player_entity->p;
+                    fireball->dp = (V2){.x=10, .y=0}; // @TODO: Use facing.
+                    fireball->ddp = (V2){.x=0, .y=0};
+                    fireball->collision_pieces[0] = (Geometry){
+                        .type = GT_CIRCLE,
+                        .circle = {
+                            .p = {.x=0, .y=0},
+                            .r = 10
+                        }
+                    };
+                    fireball->num_collision_pieces = 1;
+                    fireball->next = NULL;
+                }
+            }
+
             frame_acceleration.x *= SPEED;
             frame_acceleration.y *= SPEED;
             player_entity->ddp = frame_acceleration;
@@ -261,8 +307,10 @@ void simulation_step(const SimulationState *prev, SimulationState *next, const P
         // @TODO: ODE for real friction.
         // @TODO: Does this seem really wrong?
         //printf("ddp before friction: %f", entity->ddp.x);
-        entity->ddp.x += -FRICTION * entity->dp.x;
-        entity->ddp.y += -FRICTION * entity->dp.y;
+        if (flags_is_set(entity->flags, EF_FRICTION)) {
+            entity->ddp.x += -FRICTION * entity->dp.x;
+            entity->ddp.y += -FRICTION * entity->dp.y;
+        }
         //printf(", ddp after friction: %f\n", entity->ddp.x);
 
         // @TODO: You know like everything, collision detection and response.

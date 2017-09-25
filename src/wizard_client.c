@@ -83,7 +83,8 @@ int main(int argc, char**argv ) {
             .pressing_up = IsKeyDown(KEY_W),
             .pressing_down = IsKeyDown(KEY_S),
             .pressing_left = IsKeyDown(KEY_A),
-            .pressing_right = IsKeyDown(KEY_D)
+            .pressing_right = IsKeyDown(KEY_D),
+            .pressed_attack = IsKeyPressed(KEY_SPACE)
         };
 
         SimulationState next_state = state;
@@ -142,6 +143,21 @@ int main(int argc, char**argv ) {
         V2 player_size = (V2){0.3*2, 1};
         //DrawRectangle(WORLD(player_min).x, WORLD(player_min).y, WORLD(player_max).x, WORLD(player_max).y, BLUE);
         DrawRectangleV(world_player_p, (Vector2){0.3*2*scale.x, 1*scale.y}, BLUE);
+
+        // Draw fireballs!
+        for (int i=0; i<state.num_entities; i++) {
+            Entity *entity = state.entities + i;
+            switch(entity->type) {
+                case ET_NONE:
+                    break;
+                case ET_FIREBALL: {
+                    Vector2 fireball_pos = WORLD(entity->p);
+                    DrawCircleV(fireball_pos, scale.x/4, RED);
+                } break;
+                case ET_PLAYER:
+                    break;
+            }
+        }
 
         //DrawRectangle(state.entities[0].dp.x * draw_scale - 0.3*draw_scale, GetScreenHeight()/2 - state.entities[0].dp.y * draw_scale - 1*draw_scale, 0.3*2 * draw_scale, 1 * draw_scale, BLUE);
         //DrawCircle(0,0,10,RED);
