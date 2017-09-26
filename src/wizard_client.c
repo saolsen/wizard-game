@@ -78,14 +78,31 @@ int main(int argc, char**argv ) {
             }
             client_packet_free(&client);
         }
+        
 
         PlayerInput frame_input = {
             .pressing_up = IsKeyDown(KEY_W),
             .pressing_down = IsKeyDown(KEY_S),
             .pressing_left = IsKeyDown(KEY_A),
             .pressing_right = IsKeyDown(KEY_D),
-            .pressed_attack = IsKeyPressed(KEY_SPACE)
+            .pressed_attack = IsKeyPressed(KEY_SPACE),
+            .facing = FACING_UP,
         };
+
+        // @TODO: You really want facing to be the last button press. You can't do that with this polling api, you need
+        // to actually iterate over the input events in order.
+        if (frame_input.pressing_up) {
+            frame_input.facing = FACING_UP;
+        }
+        if (frame_input.pressing_down) {
+            frame_input.facing = FACING_DOWN;
+        }
+        if (frame_input.pressing_left) {
+            frame_input.facing = FACING_LEFT;
+        }
+        if (frame_input.pressing_right) {
+            frame_input.facing = FACING_RIGHT;
+        }
 
         SimulationState next_state = state;
         simulation_step(&state, &next_state, &frame_input, (float)delta_time);

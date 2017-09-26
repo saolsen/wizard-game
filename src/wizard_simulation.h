@@ -269,12 +269,41 @@ void simulation_step(const SimulationState *prev, SimulationState *next, const P
                 }
 
                 if (fireball) {
+                    // some thoughts on fireballs
+                    // only add player v in directons perpendicular to the facing direction
+                    // that way they can shoot up and down but running doesn't make bullets faster.
+                    V2 fireball_direction = {0};
+                    V2 fireball_dp = {0};
+                    const int fireball_speed = 10;
+                    switch(player_entity->facing) {
+                        case FACING_LEFT: {
+                            fireball_direction = (V2){.x=-1, .y=0};
+                            fireball_dp = (V2){.x=fireball_direction.x * fireball_speed, .y=player_entity->dp.y};
+                            break;
+                        }
+                        case FACING_RIGHT: {
+                            fireball_direction = (V2){.x=1, .y=0};
+                            fireball_dp = (V2){.x=fireball_direction.x * fireball_speed, .y=player_entity->dp.y};
+                            break;
+                        }
+                        case FACING_UP: {
+                            fireball_direction = (V2){.x=0, .y=1};
+                            fireball_dp = (V2){.x=player_entity->dp.x, .y=fireball_direction.y * fireball_speed};
+                            break;
+                        }
+                        case FACING_DOWN: {
+                            fireball_direction = (V2){.x=0, .y=-1};
+                            fireball_dp = (V2){.x=player_entity->dp.x, .y=fireball_direction.y * fireball_speed};
+                            break;
+                        }
+                    };
+
                     fireball->entity_id = 2; // @TODO
                     fireball->flags = EF_COLLIDES;
                     fireball->type = ET_FIREBALL;
                     fireball->facing = player_entity->facing;
-                    fireball->p = player_entity->p;
-                    fireball->dp = (V2){.x=10, .y=0}; // @TODO: Use facing.
+                    fireball->p = (V2){.x=player_entity->p.x, .y=player_entity->p.y+1};
+                    fireball->dp = fireball_dp;
                     fireball->ddp = (V2){.x=0, .y=0};
                     fireball->collision_pieces[0] = (Geometry){
                         .type = GT_CIRCLE,
